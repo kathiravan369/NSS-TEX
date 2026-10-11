@@ -1,0 +1,38 @@
+{
+  "name": "nss-towels-erp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NSS TOWELS / TexMan ERP Manufacturing Management Desktop Application",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node backend/server.js",
+    "dev:backend": "node backend/server.js",
+    "test": "node backend/tests/apiTest.js",
+    "test:e2e": "node backend/tests/e2eQaVerification.js",
+    "electron": "electron .",
+    "electron:dev": "electron .",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "lucide-react": "^1.16.0",
+    "mongoose": "^8.9.0",
+    "morgan": "^1.10.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "recharts": "^2.15.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.1",
+    "vite": "^6.0.1"
+  }
+}
