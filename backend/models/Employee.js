@@ -27,12 +27,11 @@ const employeeSchema = new mongoose.Schema(
     },
     workType: {
       type: String,
-      required: [true, 'Work type is required'],
-      enum: {
-        values: ['DAY_SALARY', 'COUNT_SALARY', 'Day Salary', 'Count Salary', 'Count Based Salary', 'Size Based Salary', 'SIZE_SALARY'],
-        message: '{VALUE} is not a supported work type'
-      },
       default: 'Day Salary'
+    },
+    workTypes: {
+      type: [String],
+      default: ['Day Salary']
     },
     dailyRate: {
       type: Number,
@@ -48,6 +47,15 @@ const employeeSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: ''
+    },
+    sizeRates: {
+      type: [
+        {
+          size: { type: String, trim: true },
+          rate: { type: Number, min: 0 }
+        }
+      ],
+      default: []
     },
     status: {
       type: String,
@@ -66,10 +74,8 @@ const employeeSchema = new mongoose.Schema(
   }
 );
 
-// Normalize workType and status before saving
+// Normalize status before saving
 employeeSchema.pre('save', function (next) {
-  if (this.workType === 'Day Salary') this.workType = 'DAY_SALARY';
-  if (this.workType === 'Count Salary') this.workType = 'COUNT_SALARY';
   if (this.status === 'ACTIVE') this.status = 'Active';
   if (this.status === 'INACTIVE') this.status = 'Inactive';
   next();

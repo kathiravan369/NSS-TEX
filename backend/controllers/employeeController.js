@@ -23,8 +23,18 @@ exports.getEmployees = async (req, res, next) => {
       }
 
       if (workType && workType !== 'All Work Types') {
-        const normalizedType = workType.includes('Day') ? 'DAY_SALARY' : 'COUNT_SALARY';
-        query.workType = normalizedType;
+        if (workType === 'Day Salary') {
+          query.$or = [{ workType: { $regex: 'Day', $options: 'i' } }, { workTypes: { $in: ['Day Salary'] } }];
+        } else if (workType === 'Count Salary') {
+          query.$or = [{ workType: { $regex: 'Count', $options: 'i' } }, { workTypes: { $in: ['Count Salary'] } }];
+        } else if (workType === 'Size Salary') {
+          query.$or = [{ workType: { $regex: 'Size', $options: 'i' } }, { workTypes: { $in: ['Size Salary'] } }];
+        } else if (workType === 'Multiple Types' || workType === 'Multiple') {
+          query.$or = [
+            { 'workTypes.1': { $exists: true } },
+            { workType: { $regex: ',', $options: 'i' } }
+          ];
+        }
       }
 
       if (status && status !== 'All Status') {
@@ -62,11 +72,16 @@ exports.getEmployees = async (req, res, next) => {
     }
 
     if (workType && workType !== 'All Work Types') {
-      filtered = filtered.filter((e) =>
-        workType.includes('Day')
-          ? e.type === 'Day Salary' || e.workType === 'DAY_SALARY'
-          : e.type === 'Count Salary' || e.workType === 'COUNT_SALARY'
-      );
+      filtered = filtered.filter((e) => {
+        const typesStr = `${e.type || ''} ${e.workType || ''} ${(e.workTypes || []).join(' ')}`.toLowerCase();
+        if (workType === 'Day Salary') return typesStr.includes('day');
+        if (workType === 'Count Salary') return typesStr.includes('count');
+        if (workType === 'Size Salary') return typesStr.includes('size');
+        if (workType === 'Multiple Types' || workType === 'Multiple') {
+          return (e.workTypes && e.workTypes.length > 1) || typesStr.includes(',');
+        }
+        return true;
+      });
     }
 
     if (status && status !== 'All Status') {
@@ -116,14 +131,17 @@ exports.getEmployeeById = async (req, res, next) => {
 // @access  Public
 exports.createEmployee = async (req, res, next) => {
   try {
-    const { name, phone, type, workType, dailyRate, pieceRate, productType, status, joinDate, notes, empId } = req.body;
+    const { name, phone, type, workType, workTypes, dailyRate, pieceRate, productType, sizeRates, status, joinDate, notes, empId } = req.body;
 
     if (!name || !phone) {
       return res.status(400).json({ success: false, error: 'Employee name and phone are required' });
     }
 
     const isDbConnected = mongoose.connection.readyState === 1;
-    const normalizedType = (type || workType || '').includes('Day') ? 'DAY_SALARY' : 'COUNT_SALARY';
+    const resolvedWorkTypes = Array.isArray(workTypes) && workTypes.length > 0 
+      ? workTypes 
+      : [type || workType || 'Day Salary'];
+    const resolvedTypeStr = resolvedWorkTypes.join(', ');
 
     if (isDbConnected) {
       let finalEmpId = empId;
@@ -136,10 +154,12 @@ exports.createEmployee = async (req, res, next) => {
         empId: finalEmpId,
         name,
         phone,
-        workType: normalizedType,
+        workType: resolvedTypeStr,
+        workTypes: resolvedWorkTypes,
         dailyRate: Number(dailyRate) || 0,
         pieceRate: Number(pieceRate) || 0,
         productType: productType || '',
+        sizeRates: Array.isArray(sizeRates) ? sizeRates : [],
         status: status || 'Active',
         joinDate: joinDate ? new Date(joinDate) : new Date(),
         notes: notes || ''
@@ -157,11 +177,13 @@ exports.createEmployee = async (req, res, next) => {
       empId: finalId,
       name,
       phone,
-      type: normalizedType === 'DAY_SALARY' ? 'Day Salary' : 'Count Salary',
-      workType: normalizedType,
+      type: resolvedTypeStr,
+      workType: resolvedTypeStr,
+      workTypes: resolvedWorkTypes,
       dailyRate: Number(dailyRate) || 0,
       pieceRate: Number(pieceRate) || 0,
       productType: productType || '',
+      sizeRates: Array.isArray(sizeRates) ? sizeRates : [],
       status: status || 'Active',
       joinDate: joinDate || new Date().toISOString().split('T')[0],
       notes: notes || ''

@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Eye,
   Edit2,
   Trash2,
@@ -24,12 +26,67 @@ export default function DataTable({
   page = 1,
   totalPages = 1,
   totalItems = 0,
-  itemsPerPage = 10,
+  itemsPerPage = 20,
   onPageChange,
+  onItemsPerPageChange,
   sortField,
   sortOrder = 'asc',
   onSort
 }) {
+  const [pageSizeOpen, setPageSizeOpen] = useState(false);
+  const pageSizeRef = useRef(null);
+  const [internalPageSize, setInternalPageSize] = useState(itemsPerPage || 20);
+
+  useEffect(() => {
+    if (itemsPerPage) {
+      setInternalPageSize(itemsPerPage);
+    }
+  }, [itemsPerPage]);
+
+  // Click outside listener for upward items per page menu
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (pageSizeRef.current && !pageSizeRef.current.contains(e.target)) {
+        setPageSizeOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handlePageSizeSelect = (size) => {
+    setInternalPageSize(size);
+    setPageSizeOpen(false);
+    if (onItemsPerPageChange) {
+      onItemsPerPageChange(size);
+    }
+    if (onPageChange) {
+      onPageChange(1);
+    }
+  };
+
+  const effectiveItemsPerPage = itemsPerPage || internalPageSize || 20;
+  const effectiveTotalItems = totalItems !== undefined && totalItems !== null ? totalItems : data.length;
+  const computedTotalPages = totalPages || Math.ceil(effectiveTotalItems / effectiveItemsPerPage) || 1;
+  const currentPage = page || 1;
+
+  // Generate page numbers
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    if (computedTotalPages <= maxVisible) {
+      for (let i = 1; i <= computedTotalPages; i++) pages.push(i);
+    } else {
+      let start = Math.max(1, currentPage - 2);
+      let end = Math.min(computedTotalPages, start + maxVisible - 1);
+      if (end - start < maxVisible - 1) {
+        start = Math.max(1, end - maxVisible + 1);
+      }
+      for (let i = start; i <= end; i++) pages.push(i);
+    }
+    return pages;
+  };
+
   return (
     <div className="table-wrapper">
       <div className="table-responsive">
@@ -99,8 +156,8 @@ export default function DataTable({
                 const displaySno = row.sno !== undefined && row.sno !== null
                   ? row.sno
                   : (sortField === 'sno' && sortOrder === 'desc'
-                      ? Math.max(1, totalItems - ((page - 1) * itemsPerPage + idx))
-                      : (page - 1) * itemsPerPage + idx + 1);
+                      ? Math.max(1, effectiveTotalItems - ((currentPage - 1) * effectiveItemsPerPage + idx))
+                      : (currentPage - 1) * effectiveItemsPerPage + idx + 1);
 
                 return (
                   <tr key={row[keyField] || idx}>
@@ -193,52 +250,188 @@ export default function DataTable({
         </table>
       </div>
 
-      {/* Pagination Footer */}
+      {/* Pagination Footer Matching Provided Image */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0.85rem 0.25rem 0.25rem',
-          fontSize: '0.8rem',
-          color: 'var(--text-muted)'
+          padding: '1rem 0.5rem 0.5rem',
+          fontSize: '0.85rem',
+          color: '#64748b',
+          flexWrap: 'wrap',
+          gap: '1rem'
         }}
       >
-        <div>
-          Showing {data.length > 0 ? (page - 1) * itemsPerPage + 1 : 0} to{' '}
-          {Math.min(page * itemsPerPage, totalItems || data.length)} of {totalItems || data.length} entries
+        {/* Left: Items Per Page [ 20 ^ ] of 69 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', position: 'relative' }}>
+          <span style={{ color: '#475569', fontWeight: 500, fontSize: '0.85rem' }}>
+            Items Per Page
+          </span>
+
+          <div ref={pageSizeRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setPageSizeOpen(prev => !prev)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '0.35rem 0.65rem',
+                backgroundColor: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                color: '#1e293b',
+                cursor: 'pointer',
+                minWidth: '64px',
+                justifyContent: 'space-between',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>{effectiveItemsPerPage}</span>
+              <ChevronUp
+                size={14}
+                color="#64748b"
+                style={{
+                  transform: pageSizeOpen ? 'rotate(180deg)' : 'none',
+                  transition: 'transform 0.15s ease'
+                }}
+              />
+            </button>
+
+            {/* Upward Dropdown Menu */}
+            {pageSizeOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 'calc(100% + 6px)',
+                  left: 0,
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
+                  padding: '6px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  zIndex: 999,
+                  minWidth: '76px',
+                  boxSizing: 'border-box'
+                }}
+              >
+                {[20, 50, 100].map((option) => (
+                  <div
+                    key={option}
+                    onClick={() => handlePageSizeSelect(option)}
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      color: effectiveItemsPerPage === option ? '#0f172a' : '#64748b',
+                      backgroundColor: effectiveItemsPerPage === option ? '#e2e8f0' : 'transparent',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (effectiveItemsPerPage !== option) e.currentTarget.style.backgroundColor = '#eef2f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (effectiveItemsPerPage !== option) e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    {option}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <span style={{ color: '#64748b', fontWeight: 500, fontSize: '0.85rem' }}>
+            of {effectiveTotalItems}
+          </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        {/* Right: Pagination Controls < 1 2 3 4 > */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+          {/* Previous Button */}
           <button
             type="button"
-            className="action-icon-btn"
-            disabled={page <= 1}
-            onClick={() => onPageChange && onPageChange(page - 1)}
-            style={{ opacity: page <= 1 ? 0.5 : 1, cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
-          >
-            <ChevronLeft size={14} />
-          </button>
-          <span
+            disabled={currentPage <= 1}
+            onClick={() => onPageChange && onPageChange(currentPage - 1)}
             style={{
-              padding: '0.2rem 0.6rem',
-              background: 'var(--primary-600)',
-              color: '#ffffff',
-              borderRadius: 'var(--radius-sm)',
-              fontWeight: 600,
-              fontSize: '0.75rem'
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: currentPage <= 1 ? '#f8fafc' : '#ffffff',
+              color: currentPage <= 1 ? '#cbd5e1' : '#334155',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+              opacity: currentPage <= 1 ? 0.6 : 1,
+              transition: 'all 0.15s ease'
             }}
           >
-            {page}
-          </span>
+            <ChevronLeft size={16} />
+          </button>
+
+          {/* Page Numbers */}
+          {getPageNumbers().map((num) => {
+            const isActive = num === currentPage;
+            return (
+              <button
+                key={num}
+                type="button"
+                onClick={() => onPageChange && onPageChange(num)}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  border: isActive ? 'none' : '1px solid #e2e8f0',
+                  backgroundColor: isActive ? '#1e293b' : '#ffffff',
+                  color: isActive ? '#ffffff' : '#475569',
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.15)' : 'none'
+                }}
+              >
+                {num}
+              </button>
+            );
+          })}
+
+          {/* Next Button */}
           <button
             type="button"
-            className="action-icon-btn"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange && onPageChange(page + 1)}
-            style={{ opacity: page >= totalPages ? 0.5 : 1, cursor: page >= totalPages ? 'not-allowed' : 'pointer' }}
+            disabled={currentPage >= computedTotalPages}
+            onClick={() => onPageChange && onPageChange(currentPage + 1)}
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              border: currentPage >= computedTotalPages ? '1px solid #e2e8f0' : 'none',
+              backgroundColor: currentPage >= computedTotalPages ? '#f8fafc' : '#1e293b',
+              color: currentPage >= computedTotalPages ? '#cbd5e1' : '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: currentPage >= computedTotalPages ? 'not-allowed' : 'pointer',
+              opacity: currentPage >= computedTotalPages ? 0.6 : 1,
+              transition: 'all 0.15s ease',
+              boxShadow: currentPage < computedTotalPages ? '0 1px 3px rgba(0,0,0,0.15)' : 'none'
+            }}
           >
-            <ChevronRight size={14} />
+            <ChevronRight size={16} />
           </button>
         </div>
       </div>
