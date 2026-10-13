@@ -46,7 +46,7 @@ const DEFAULT_SIZE_PRODUCTION = [
 const INITIAL_RECORD = {
   empId: '',
   employeeName: '',
-  workType: 'Size Based Salary', // 'Size Based Salary' | 'Count Based Salary' | 'Day Salary'
+  workType: '', // Assigned automatically once employee is selected
   productName: 'Towel',
   workDate: defaultToday,
 
@@ -311,7 +311,7 @@ export default function WeeklySalary() {
   // Allowed salary calculation methods based on employee's configured salary types
   const allowedSalaryTypes = useMemo(() => {
     if (!selectedEmployee) {
-      return ['Day Salary', 'Count Based Salary', 'Size Based Salary'];
+      return [];
     }
 
     const assigned = [];
@@ -341,7 +341,8 @@ export default function WeeklySalary() {
       setRecordForm(prev => ({
         ...prev,
         empId: '',
-        employeeName: ''
+        employeeName: '',
+        workType: ''
       }));
       return;
     }
@@ -404,6 +405,7 @@ export default function WeeklySalary() {
       ...INITIAL_RECORD,
       empId: '',
       employeeName: '',
+      workType: '',
       sizeRates: [...DEFAULT_SIZE_RATES],
       sizeProduction: [...DEFAULT_SIZE_PRODUCTION]
     });
@@ -416,6 +418,7 @@ export default function WeeklySalary() {
       ...INITIAL_RECORD,
       empId: '',
       employeeName: '',
+      workType: '',
       sizeRates: [...DEFAULT_SIZE_RATES],
       sizeProduction: [...DEFAULT_SIZE_PRODUCTION]
     });
@@ -836,7 +839,16 @@ export default function WeeklySalary() {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
           {/* Top Control Bar */}
-          <div className="salary-top-bar" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid #e2e8f0' }}>
+          <div
+            className="salary-top-bar"
+            style={{
+              backgroundColor: '#f8fafc',
+              padding: '1rem',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid #e2e8f0',
+              gridTemplateColumns: recordForm.empId ? '1.3fr 1.8fr 1.1fr 1fr' : '1.5fr 1.1fr 1fr'
+            }}
+          >
             {/* 1. Employee Selection - User picks employee */}
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontWeight: 600 }}>
@@ -862,48 +874,50 @@ export default function WeeklySalary() {
               </select>
             </div>
 
-            {/* 2. Salary Calculation Method Selector - Only shows types assigned to selected employee */}
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>
-                  Work Type / Method <span style={{ color: '#dc2626' }}>*</span>
-                </label>
-                {selectedEmployee && (
-                  <span style={{ fontSize: '0.68rem', color: '#0369a1', fontWeight: 600, backgroundColor: '#e0f2fe', padding: '1px 6px', borderRadius: '4px' }}>
-                    Assigned for {selectedEmployee.name.split(' ')[0]}
-                  </span>
-                )}
+            {/* 2. Salary Calculation Method Selector - Once employee selected then only show for the work type */}
+            {recordForm.empId && (
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>
+                    Work Type / Method <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  {selectedEmployee && (
+                    <span style={{ fontSize: '0.68rem', color: '#0369a1', fontWeight: 600, backgroundColor: '#e0f2fe', padding: '1px 6px', borderRadius: '4px' }}>
+                      Assigned for {selectedEmployee.name.split(' ')[0]}
+                    </span>
+                  )}
+                </div>
+                <div className="salary-type-pills">
+                  {allowedSalaryTypes.includes('Day Salary') && (
+                    <button
+                      type="button"
+                      className={`salary-type-pill ${recordForm.workType === 'Day Salary' ? 'active' : ''}`}
+                      onClick={() => setRecordForm(prev => ({ ...prev, workType: 'Day Salary' }))}
+                    >
+                      Day
+                    </button>
+                  )}
+                  {allowedSalaryTypes.includes('Count Based Salary') && (
+                    <button
+                      type="button"
+                      className={`salary-type-pill ${recordForm.workType === 'Count Based Salary' ? 'active' : ''}`}
+                      onClick={() => setRecordForm(prev => ({ ...prev, workType: 'Count Based Salary' }))}
+                    >
+                      Count
+                    </button>
+                  )}
+                  {allowedSalaryTypes.includes('Size Based Salary') && (
+                    <button
+                      type="button"
+                      className={`salary-type-pill ${recordForm.workType === 'Size Based Salary' ? 'active' : ''}`}
+                      onClick={() => setRecordForm(prev => ({ ...prev, workType: 'Size Based Salary' }))}
+                    >
+                      Size
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="salary-type-pills">
-                {allowedSalaryTypes.includes('Day Salary') && (
-                  <button
-                    type="button"
-                    className={`salary-type-pill ${recordForm.workType === 'Day Salary' ? 'active' : ''}`}
-                    onClick={() => setRecordForm(prev => ({ ...prev, workType: 'Day Salary' }))}
-                  >
-                    Day
-                  </button>
-                )}
-                {allowedSalaryTypes.includes('Count Based Salary') && (
-                  <button
-                    type="button"
-                    className={`salary-type-pill ${recordForm.workType === 'Count Based Salary' ? 'active' : ''}`}
-                    onClick={() => setRecordForm(prev => ({ ...prev, workType: 'Count Based Salary' }))}
-                  >
-                    Count
-                  </button>
-                )}
-                {allowedSalaryTypes.includes('Size Based Salary') && (
-                  <button
-                    type="button"
-                    className={`salary-type-pill ${recordForm.workType === 'Size Based Salary' ? 'active' : ''}`}
-                    onClick={() => setRecordForm(prev => ({ ...prev, workType: 'Size Based Salary' }))}
-                  >
-                    Size
-                  </button>
-                )}
-              </div>
-            </div>
+            )}
 
             {/* 3. Product / Work */}
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -941,6 +955,45 @@ export default function WeeklySalary() {
           </div>
 
           {/* --- MAIN CALCULATION INTERFACE --- */}
+
+          {!recordForm.empId ? (
+            <div
+              style={{
+                padding: '3rem 1.5rem',
+                backgroundColor: '#f8fafc',
+                border: '2px dashed #cbd5e1',
+                borderRadius: 'var(--radius-lg)',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.75rem'
+              }}
+            >
+              <div
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  backgroundColor: '#e0f2fe',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#0284c7'
+                }}
+              >
+                <Users size={26} />
+              </div>
+              <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>
+                Please Select an Employee First
+              </h4>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0, maxWidth: '420px', lineHeight: 1.5 }}>
+                Choose an employee from the dropdown above. The assigned work type (Day, Count, or Size-based salary) and calculation details will appear automatically.
+              </p>
+            </div>
+          ) : (
+            <>
 
           {/* OPTION 1: SIZE-BASED SALARY */}
           {recordForm.workType === 'Size Based Salary' && (
@@ -1609,6 +1662,8 @@ export default function WeeklySalary() {
                 </div>
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       </Modal>
