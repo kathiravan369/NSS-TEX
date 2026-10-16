@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   Calendar,
@@ -25,6 +26,7 @@ import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
 import { storageService } from '../services/storageService';
 import { formatINR, formatDate, formatDateTime } from '../utils/formatters';
+import EmployeeSalarySidePanel from '../components/employee/EmployeeSalarySidePanel';
 
 export const DEFAULT_SIZE_RATES = [
   { size: 'Large (30 × 60)', rate: 5 },
@@ -61,11 +63,13 @@ const INITIAL_FORM = {
 };
 
 export default function EmployeeManagement() {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [editingId, setEditingId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewingItem, setViewingItem] = useState(null);
+  const [sidePanelEmployee, setSidePanelEmployee] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -265,8 +269,50 @@ export default function EmployeeManagement() {
 
   const columns = [
     { key: 'id', header: 'S. No', width: '55px' },
-    { key: 'empId', header: 'Employee ID', render: (val) => <code>{val}</code> },
-    { key: 'name', header: 'Employee Name', render: (val) => <strong>{val}</strong> },
+    {
+      key: 'empId',
+      header: 'Employee ID',
+      render: (val, row) => (
+        <code
+          style={{ cursor: 'pointer', color: '#0284c7', fontWeight: 700 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSidePanelEmployee(row);
+          }}
+          title="Click to view employee salary breakdown"
+        >
+          {val}
+        </code>
+      )
+    },
+    {
+      key: 'name',
+      header: 'Employee Name',
+      render: (val, row) => (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSidePanelEmployee(row);
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            fontWeight: 700,
+            color: 'var(--primary-600)',
+            cursor: 'pointer',
+            textAlign: 'left',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+          title="Click to view employee salary breakdown"
+        >
+          {val}
+        </button>
+      )
+    },
     { key: 'phone', header: 'Phone Number' },
     {
       key: 'type',
@@ -535,7 +581,8 @@ export default function EmployeeManagement() {
         <DataTable
           columns={columns}
           data={paginatedItems}
-          onView={(row) => setViewingItem(row)}
+          onRowClick={(row) => setSidePanelEmployee(row)}
+          onView={(row) => setSidePanelEmployee(row)}
           onEdit={(row) => handleEdit(row)}
           onDelete={(row) => setDeletingId(row._id || row.id)}
           page={page}
@@ -1036,6 +1083,15 @@ export default function EmployeeManagement() {
         onConfirm={handleDelete}
         title="Delete Employee"
         message="Are you sure you want to remove this employee from the directory?"
+      />
+
+      {/* Employee Salary Breakdown Sidepanel */}
+      <EmployeeSalarySidePanel
+        isOpen={!!sidePanelEmployee}
+        onClose={() => setSidePanelEmployee(null)}
+        employee={sidePanelEmployee}
+        onEditEmployee={(emp) => handleEdit(emp)}
+        onRecordSalary={(emp) => navigate('/salary/weekly')}
       />
     </div>
   );

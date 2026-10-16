@@ -10,6 +10,7 @@ import ElectricityCost from './pages/ElectricityCost';
 import EmployeeManagement from './pages/EmployeeManagement';
 import WeeklySalary from './pages/WeeklySalary';
 import SalaryReports from './pages/SalaryReports';
+import WeeklySalaryReport from './pages/WeeklySalaryReport';
 
 export default function App() {
   return (
@@ -23,6 +24,8 @@ export default function App() {
         <Route path="electricity-cost" element={<ElectricityCost />} />
         <Route path="salary/employees" element={<EmployeeManagement />} />
         <Route path="salary/weekly" element={<WeeklySalary />} />
+        <Route path="salary/weekly-report" element={<WeeklySalaryReport />} />
+        <Route path="salary/reports/weekly" element={<WeeklySalaryReport />} />
         <Route path="salary/reports" element={<SalaryReports />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

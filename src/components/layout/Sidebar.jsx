@@ -14,7 +14,8 @@ import {
   FileSpreadsheet,
   Cpu,
   Package2,
-  DollarSign
+  DollarSign,
+  Calendar
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -142,7 +143,7 @@ export default function Sidebar() {
               className={({ isActive }) => `submenu-item ${isActive ? 'active' : ''}`}
             >
               <Users size={15} />
-              <span>Employee Management</span>
+              <span>Add Employee</span>
             </NavLink>
             <NavLink
               to="/salary/weekly"
@@ -152,11 +153,18 @@ export default function Sidebar() {
               <span>Weekly Salary</span>
             </NavLink>
             <NavLink
-              to="/salary/reports"
+              to="/salary/weekly-report"
               className={({ isActive }) => `submenu-item ${isActive ? 'active' : ''}`}
             >
               <FileSpreadsheet size={15} />
-              <span>Salary Reports</span>
+              <span>Weekly Report</span>
+            </NavLink>
+            <NavLink
+              to="/salary/reports"
+              className={({ isActive }) => `submenu-item ${isActive ? 'active' : ''}`}
+            >
+              <Calendar size={15} />
+              <span>Monthly Report</span>
             </NavLink>
           </div>
         )}

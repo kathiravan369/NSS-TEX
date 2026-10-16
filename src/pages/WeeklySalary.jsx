@@ -16,7 +16,9 @@ import {
   RotateCcw,
   Sparkles,
   Save,
-  FileText
+  FileText,
+  Filter,
+  CalendarDays
 } from 'lucide-react';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
@@ -77,6 +79,10 @@ export default function WeeklySalary() {
   const [weekStart, setWeekStart] = useState('2026-10-08');
   const [weekEnd, setWeekEnd] = useState('2026-10-14');
   const [workTypeFilter, setWorkTypeFilter] = useState('All');
+  const [dateFilter, setDateFilter] = useState('All Time'); // 'All Time' | 'Today' | 'This Week' | 'This Month' | 'This Year' | 'Custom Day' | 'Custom Range'
+  const [customSingleDate, setCustomSingleDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('sno');
   const [sortOrder, setSortOrder] = useState('asc');
@@ -157,17 +163,31 @@ export default function WeeklySalary() {
   // Net Pay = Gross Salary - Deductions
   const computedNetSalary = Math.max(0, computedGrossSalary - (Number(recordForm.deductions) || 0));
 
-  // Summary Metrics for Bottom Bar
-  const summary = useMemo(() => {
-    const totalEmployees = items.length;
-    const totalGross = items.reduce((acc, curr) => acc + (Number(curr.grossPay) || 0), 0);
-    const totalDeductions = items.reduce((acc, curr) => acc + (Number(curr.deductions) || 0), 0);
-    const totalNet = items.reduce((acc, curr) => acc + (Number(curr.netPay) || 0), 0);
-    return { totalEmployees, totalGross, totalDeductions, totalNet };
-  }, [items]);
+  // Safe Date parsing helper to handle YYYY-MM-DD local timezone consistently
+  const parseDateSafe = (dStr) => {
+    if (!dStr) return null;
+    if (typeof dStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dStr)) {
+      const parts = dStr.split('T')[0].split('-');
+      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    }
+    const d = new Date(dStr);
+    return isNaN(d.getTime()) ? null : d;
+  };
 
-  // Filtered & Sorted Items for Grid
+  // Filtered Items for Grid
   const filteredItems = useMemo(() => {
+    const now = new Date();
+    const todayYear = now.getFullYear();
+    const todayMonth = now.getMonth();
+    const todayDate = now.getDate();
+
+    // Start of week (Monday 00:00:00) to end of week (Sunday 23:59:59)
+    const dayOfWeek = (now.getDay() + 6) % 7;
+    const startOfWeek = new Date(todayYear, todayMonth, todayDate - dayOfWeek, 0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
     return items.filter((item) => {
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
@@ -181,9 +201,69 @@ export default function WeeklySalary() {
         workTypeFilter === 'All' ||
         (item.workType || '').toLowerCase() === workTypeFilter.toLowerCase();
 
-      return matchesSearch && matchesType;
+      if (!matchesSearch || !matchesType) return false;
+
+      // Date Filtering
+      const recDate = parseDateSafe(item.workDate || item.weekEnd || item.weekStart || item.createdAt || item.date);
+
+      if (dateFilter === 'Today') {
+        if (!recDate) return false;
+        if (
+          recDate.getFullYear() !== todayYear ||
+          recDate.getMonth() !== todayMonth ||
+          recDate.getDate() !== todayDate
+        ) {
+          return false;
+        }
+      } else if (dateFilter === 'This Week') {
+        if (!recDate || recDate < startOfWeek || recDate > endOfWeek) {
+          return false;
+        }
+      } else if (dateFilter === 'This Month') {
+        if (!recDate || recDate.getMonth() !== todayMonth || recDate.getFullYear() !== todayYear) {
+          return false;
+        }
+      } else if (dateFilter === 'This Year') {
+        if (!recDate || recDate.getFullYear() !== todayYear) {
+          return false;
+        }
+      } else if (dateFilter === 'Custom Day') {
+        if (customSingleDate) {
+          const [cy, cm, cd] = customSingleDate.split('-').map(Number);
+          if (
+            !recDate ||
+            recDate.getFullYear() !== cy ||
+            recDate.getMonth() !== cm - 1 ||
+            recDate.getDate() !== cd
+          ) {
+            return false;
+          }
+        }
+      } else if (dateFilter === 'Custom Range') {
+        if (customStartDate) {
+          const [sy, sm, sd] = customStartDate.split('-').map(Number);
+          const startD = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+          if (!recDate || recDate < startD) return false;
+        }
+        if (customEndDate) {
+          const [ey, em, ed] = customEndDate.split('-').map(Number);
+          const endD = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+          if (!recDate || recDate > endD) return false;
+        }
+      }
+
+      return true;
     });
-  }, [items, searchQuery, workTypeFilter]);
+  }, [items, searchQuery, workTypeFilter, dateFilter, customSingleDate, customStartDate, customEndDate]);
+
+  // Summary Metrics for Bottom Bar (dynamically matches active filters)
+  const summary = useMemo(() => {
+    const totalEmployees = filteredItems.length;
+    const totalGross = filteredItems.reduce((acc, curr) => acc + (Number(curr.grossPay) || 0), 0);
+    const totalDeductions = filteredItems.reduce((acc, curr) => acc + (Number(curr.deductions) || 0), 0);
+    const totalNet = filteredItems.reduce((acc, curr) => acc + (Number(curr.netPay) || 0), 0);
+    return { totalEmployees, totalGross, totalDeductions, totalNet };
+  }, [filteredItems]);
 
   const sortedItems = useMemo(() => {
     const indexed = filteredItems.map((item, index) => ({
@@ -736,7 +816,7 @@ export default function WeeklySalary() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-            <div className="search-box" style={{ width: '200px', height: '34px' }}>
+            <div className="search-box" style={{ width: '180px', height: '34px' }}>
               <Search size={14} />
               <input
                 type="text"
@@ -751,7 +831,7 @@ export default function WeeklySalary() {
 
             <select
               className="form-control"
-              style={{ width: '180px', height: '34px', fontSize: '0.78rem' }}
+              style={{ width: '160px', height: '34px', fontSize: '0.78rem' }}
               value={workTypeFilter}
               onChange={(e) => {
                 setWorkTypeFilter(e.target.value);
@@ -764,6 +844,142 @@ export default function WeeklySalary() {
               <option value="Day Salary">Day Salary</option>
             </select>
           </div>
+        </div>
+
+        {/* Date Filter Bar */}
+        <div
+          style={{
+            padding: '0.6rem 1.25rem',
+            borderBottom: '1px solid var(--border-color)',
+            backgroundColor: '#f8fafc',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Filter size={13} color="var(--primary-600)" />
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>
+                Date Filter:
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+              {[
+                { id: 'Today', label: 'Today' },
+                { id: 'This Week', label: 'This Week' },
+                { id: 'This Month', label: 'This Month' },
+                { id: 'This Year', label: 'This Year' },
+                { id: 'Custom Day', label: 'Custom Day' },
+                { id: 'Custom Range', label: 'Custom Range' },
+                { id: 'All Time', label: 'All Time' }
+              ].map((p) => {
+                const isActive = dateFilter === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setDateFilter(p.id);
+                      setPage(1);
+                    }}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      fontSize: '0.72rem',
+                      fontWeight: isActive ? 700 : 500,
+                      border: isActive ? '1px solid var(--primary-600)' : '1px solid #cbd5e1',
+                      backgroundColor: isActive ? 'var(--primary-50)' : '#ffffff',
+                      color: isActive ? 'var(--primary-600)' : '#475569',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {dateFilter === 'Custom Day' && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                backgroundColor: '#ffffff',
+                padding: '0.45rem 0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid #bae6fd',
+                width: 'fit-content'
+              }}
+            >
+              <CalendarDays size={14} color="#0284c7" />
+              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#0369a1', margin: 0 }}>
+                Select Specific Day:
+              </label>
+              <input
+                type="date"
+                className="form-control"
+                style={{ height: '30px', fontSize: '0.75rem', width: '140px' }}
+                value={customSingleDate}
+                onChange={(e) => {
+                  setCustomSingleDate(e.target.value);
+                  setPage(1);
+                }}
+              />
+              {customSingleDate && (
+                <span style={{ fontSize: '0.72rem', color: '#0369a1', fontWeight: 600 }}>
+                  Showing records for: {formatDate(customSingleDate)}
+                </span>
+              )}
+            </div>
+          )}
+
+          {dateFilter === 'Custom Range' && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                backgroundColor: '#ffffff',
+                padding: '0.45rem 0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid #e2e8f0',
+                width: 'fit-content',
+                flexWrap: 'wrap'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', margin: 0 }}>From:</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  style={{ height: '30px', fontSize: '0.75rem', width: '135px' }}
+                  value={customStartDate}
+                  onChange={(e) => {
+                    setCustomStartDate(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', margin: 0 }}>To:</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  style={{ height: '30px', fontSize: '0.75rem', width: '135px' }}
+                  value={customEndDate}
+                  onChange={(e) => {
+                    setCustomEndDate(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <DataTable

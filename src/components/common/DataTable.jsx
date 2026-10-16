@@ -23,6 +23,7 @@ export default function DataTable({
   onEdit,
   onDelete,
   onStatusChange,
+  onRowClick,
   page = 1,
   totalPages = 1,
   totalItems = 0,
@@ -160,7 +161,15 @@ export default function DataTable({
                       : (currentPage - 1) * effectiveItemsPerPage + idx + 1);
 
                 return (
-                  <tr key={row[keyField] || idx}>
+                  <tr
+                    key={row[keyField] || idx}
+                    onClick={(e) => {
+                      if (onRowClick && !e.target.closest('button') && !e.target.closest('input') && !e.target.closest('select') && !e.target.closest('a')) {
+                        onRowClick(row);
+                      }
+                    }}
+                    style={{ cursor: onRowClick ? 'pointer' : 'default' }}
+                  >
                     {columns.map((col) => {
                       const isSnoColumn = col.key === 'sno' || col.header === 'S. No';
 
