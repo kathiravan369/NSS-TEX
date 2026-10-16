@@ -136,6 +136,25 @@ exports.createWeeklyPayroll = async (req, res, next) => {
     const computedNet = netPay !== undefined ? Number(netPay) : (computedGross - (Number(deductions) || 0) + (Number(adjustments) || 0));
 
     if (isDbConnected) {
+      if (weekStart && weekEnd) {
+        const existing = await WeeklyPayroll.findOne({
+          empId,
+          $or: [
+            { weekStart: effectiveWeekStart, weekEnd: effectiveWeekEnd },
+            {
+              weekStart: { $lte: effectiveWeekEnd },
+              weekEnd: { $gte: effectiveWeekStart }
+            }
+          ]
+        });
+        if (existing) {
+          return res.status(400).json({
+            success: false,
+            error: `Payroll record for employee ${empId} already exists for this week period.`
+          });
+        }
+      }
+
       const payroll = await WeeklyPayroll.create({
         empId,
         employeeName,
@@ -168,6 +187,22 @@ exports.createWeeklyPayroll = async (req, res, next) => {
       });
 
       return res.status(201).json({ success: true, data: payroll });
+    }
+
+    if (weekStart && weekEnd) {
+      const existing = runtimeStore.weeklyPayroll.find(p =>
+        p.empId === empId &&
+        (
+          (p.weekStart === weekStart && p.weekEnd === weekEnd) ||
+          (new Date(p.weekStart) <= effectiveWeekEnd && new Date(p.weekEnd) >= effectiveWeekStart)
+        )
+      );
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          error: `Payroll record for employee ${empId} already exists for this week period.`
+        });
+      }
     }
 
     const newPayroll = {

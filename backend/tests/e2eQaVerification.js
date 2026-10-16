@@ -5,7 +5,7 @@
 
 const http = require('http');
 
-const BASE_URL = 'http://localhost:5000';
+const BASE_URL = 'http://localhost:5001';
 
 function apiRequest(path, options = {}) {
   return new Promise((resolve, reject) => {
@@ -55,7 +55,33 @@ function recordResult(stepNum, testCase, expected, actual, pass, evidence) {
   console.log('---------------------------------------------------------');
 }
 
+let localServer = null;
+
+function ensureServerRunning() {
+  return new Promise((resolve) => {
+    const req = http.request(BASE_URL + '/api/health', { method: 'GET', timeout: 1000 }, (res) => {
+      resolve();
+    });
+    req.on('error', () => {
+      try {
+        const app = require('../server');
+        localServer = app.listen(5001, () => {
+          resolve();
+        });
+      } catch (e) {
+        resolve();
+      }
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve();
+    });
+    req.end();
+  });
+}
+
 async function runE2EWorkflow() {
+  await ensureServerRunning();
   console.log('\n=========================================================');
   console.log('🚀 NSS TOWELS SENIOR QA END-TO-END VERIFICATION SUITE');
   console.log('=========================================================\n');
@@ -523,9 +549,18 @@ async function runE2EWorkflow() {
   const totalFailed = results.filter(r => !r.pass).length;
   console.log(`📊 FINAL QA AUDIT: ${totalPassed} / ${results.length} PASSED (${totalFailed} Failed)`);
   console.log('=========================================================\n');
+
+  if (localServer) {
+    localServer.close();
+  }
+
+  if (totalFailed > 0) process.exit(1);
 }
 
 runE2EWorkflow().catch(err => {
+  if (localServer) {
+    localServer.close();
+  }
   console.error('Fatal QA Runner Error:', err);
   process.exit(1);
 });

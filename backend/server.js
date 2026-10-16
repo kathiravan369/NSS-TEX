@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 require('dotenv').config();
 
-const { connectDB, maskURI } = require('./config/db');
+const { connectDB, isDbConnected, maskURI } = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 
 // Route Modules
@@ -21,14 +21,15 @@ const electricityRoutes = require('./routes/electricityRoutes');
 const payrollRoutes = require('./routes/payrollRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 
-const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI;
+const PORT = process.env.PORT || 5001;
+const DB_NAME = process.env.PGDATABASE || 'nss_towels';
+const DB_PORT = process.env.PGPORT || 5000;
 
 const app = express();
 
 // Middlewares
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5000'],
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5000', 'http://localhost:5001'],
   credentials: true
 }));
 app.use(express.json());
@@ -40,29 +41,22 @@ if (process.env.NODE_ENV !== 'test') {
 
 // Health Endpoint
 app.get('/api/health', (req, res) => {
-  const dbStateMap = {
-    0: 'disconnected',
-    1: 'connected',
-    2: 'connecting',
-    3: 'disconnecting'
-  };
+  const connected = isDbConnected();
 
-  const dbState = mongoose.connection.readyState;
-  const isDbConnected = dbState === 1;
-
-  res.status(isDbConnected ? 200 : 503).json({
+  res.status(connected ? 200 : 503).json({
     success: true,
-    status: isDbConnected ? 'HEALTHY' : 'DEGRADED',
-    message: 'NSS TOWELS Manufacturing Management System API',
+    status: connected ? 'HEALTHY' : 'DEGRADED',
+    message: 'NSS TOWELS Manufacturing Management System API (PostgreSQL)',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     port: PORT,
     database: {
-      status: dbStateMap[dbState] || 'unknown',
-      connected: isDbConnected,
-      name: mongoose.connection.name || 'nss_towels',
-      host: mongoose.connection.host || 'Atlas Cluster'
+      type: 'PostgreSQL',
+      status: connected ? 'connected' : 'disconnected',
+      connected: connected,
+      name: DB_NAME,
+      host: `${process.env.PGHOST || 'localhost'}:${DB_PORT}`
     }
   });
 });
@@ -115,7 +109,7 @@ async function startServer() {
   console.log('---------------------------------------------------------');
   console.log('🚀 Initializing NSS TOWELS Backend Server...');
   console.log(`📡 Port: ${PORT}`);
-  console.log(`🔒 Database Target: ${maskURI(MONGODB_URI)}`);
+  console.log(`🔒 Database Target: PostgreSQL (${DB_NAME} on ${process.env.PGHOST || 'localhost'}:${DB_PORT})`);
   console.log('---------------------------------------------------------');
 
   const connected = await connectDB();

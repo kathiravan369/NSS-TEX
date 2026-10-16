@@ -1,6 +1,6 @@
 const http = require('http');
 
-const BASE_URL = 'http://localhost:5000';
+const BASE_URL = 'http://localhost:5001';
 
 function request(path, options = {}) {
   return new Promise((resolve, reject) => {
@@ -38,7 +38,34 @@ function request(path, options = {}) {
   });
 }
 
+let localServer = null;
+
+function ensureServerRunning() {
+  return new Promise((resolve) => {
+    const req = http.request(BASE_URL + '/api/health', { method: 'GET', timeout: 1000 }, (res) => {
+      resolve();
+    });
+    req.on('error', () => {
+      try {
+        const app = require('../server');
+        localServer = app.listen(5001, () => {
+          console.log('⚡ Started in-process test server on port 5001');
+          resolve();
+        });
+      } catch (e) {
+        resolve();
+      }
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve();
+    });
+    req.end();
+  });
+}
+
 async function runTests() {
+  await ensureServerRunning();
   console.log('\n🧪 ========================================================');
   console.log('🧪 Starting NSS TOWELS Automated API & Payroll Test Suite');
   console.log('🧪 ========================================================\n');
@@ -290,10 +317,17 @@ async function runTests() {
   console.log(`📊 Test Results: ${passed} Passed, ${failed} Failed`);
   console.log('--------------------------------------------------------\n');
 
+  if (localServer) {
+    localServer.close();
+  }
+
   if (failed > 0) process.exit(1);
 }
 
 runTests().catch(err => {
+  if (localServer) {
+    localServer.close();
+  }
   console.error('Fatal Test Runner Error:', err);
   process.exit(1);
 });

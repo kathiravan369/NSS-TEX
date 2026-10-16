@@ -1,12 +1,12 @@
 // Centralized Frontend API Service
-// Connects React.js UI to Node.js / Express backend with MongoDB persistence
-// Base URL is environment-aware and defaults to http://localhost:5000/api
+// Connects React.js UI to Node.js / Express backend with PostgreSQL persistence
+// Base URL is environment-aware and defaults to http://localhost:5001/api
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:5000/api'
-    : 'http://localhost:5000/api');
+    ? 'http://localhost:5001/api'
+    : 'http://localhost:5001/api');
 
 /**
  * Core HTTP client wrapper with error handling and retry support

@@ -11,14 +11,16 @@ if (process.platform === 'win32') {
 let backendProcess = null;
 
 function startBackendServer() {
-  const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
+  const http = require('http');
+  const checkReq = http.request('http://localhost:5000/api/health', { method: 'GET', timeout: 800 }, () => {
+    // Backend is already up and running
+  });
 
-  // In packaged mode, spawn local Node backend if not running
-  if (!isDev) {
+  checkReq.on('error', () => {
     try {
       const serverScript = path.join(__dirname, '../backend/server.js');
       backendProcess = fork(serverScript, [], {
-        env: { ...process.env, PORT: 5000, NODE_ENV: 'production' },
+        env: { ...process.env, PORT: 5000 },
         stdio: 'ignore'
       });
 
@@ -28,7 +30,9 @@ function startBackendServer() {
     } catch (err) {
       console.warn('Backend server spawn bypassed:', err.message);
     }
-  }
+  });
+
+  checkReq.end();
 }
 
 function stopBackendServer() {

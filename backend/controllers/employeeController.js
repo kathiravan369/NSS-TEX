@@ -137,6 +137,10 @@ exports.createEmployee = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Employee name and phone are required' });
     }
 
+    if ((dailyRate !== undefined && Number(dailyRate) < 0) || (pieceRate !== undefined && Number(pieceRate) < 0)) {
+      return res.status(400).json({ success: false, error: 'Daily rate and piece rate cannot be negative' });
+    }
+
     const isDbConnected = mongoose.connection.readyState === 1;
     const resolvedWorkTypes = Array.isArray(workTypes) && workTypes.length > 0 
       ? workTypes 

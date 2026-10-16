@@ -1,84 +1,20 @@
-const mongoose = require('mongoose');
+const PgModel = require('./PgModel');
 
-const employeeSchema = new mongoose.Schema(
-  {
-    empId: {
-      type: String,
-      required: [true, 'Employee ID is required'],
-      unique: true,
-      trim: true,
-      uppercase: true,
-      index: true
-    },
-    name: {
-      type: String,
-      required: [true, 'Employee name is required'],
-      trim: true
-    },
-    phone: {
-      type: String,
-      required: [true, 'Phone number is required'],
-      trim: true
-    },
-    joinDate: {
-      type: Date,
-      required: [true, 'Joining date is required'],
-      default: Date.now
-    },
-    workType: {
-      type: String,
-      default: 'Day Salary'
-    },
-    workTypes: {
-      type: [String],
-      default: ['Day Salary']
-    },
-    dailyRate: {
-      type: Number,
-      min: [0, 'Daily salary rate cannot be negative'],
-      default: 0
-    },
-    pieceRate: {
-      type: Number,
-      min: [0, 'Rate per product cannot be negative'],
-      default: 0
-    },
-    productType: {
-      type: String,
-      trim: true,
-      default: ''
-    },
-    sizeRates: {
-      type: [
-        {
-          size: { type: String, trim: true },
-          rate: { type: Number, min: 0 }
-        }
-      ],
-      default: []
-    },
-    status: {
-      type: String,
-      enum: ['ACTIVE', 'INACTIVE', 'Active', 'Inactive'],
-      default: 'Active',
-      index: true
-    },
-    notes: {
-      type: String,
-      trim: true,
-      default: ''
-    }
-  },
-  {
-    timestamps: true
-  }
-);
-
-// Normalize status before saving
-employeeSchema.pre('save', function (next) {
-  if (this.status === 'ACTIVE') this.status = 'Active';
-  if (this.status === 'INACTIVE') this.status = 'Inactive';
-  next();
+const Employee = new PgModel('employees', {
+  empId: { column: 'emp_id', type: 'string' },
+  name: { column: 'name', type: 'string' },
+  phone: { column: 'phone', type: 'string' },
+  joinDate: { column: 'join_date', type: 'date' },
+  workType: { column: 'work_type', type: 'string' },
+  workTypes: { column: 'work_types', type: 'json' },
+  dailyRate: { column: 'daily_rate', type: 'number' },
+  pieceRate: { column: 'piece_rate', type: 'number' },
+  productType: { column: 'product_type', type: 'string' },
+  sizeRates: { column: 'size_rates', type: 'json' },
+  status: { column: 'status', type: 'string' },
+  notes: { column: 'notes', type: 'string' },
+  createdAt: { column: 'created_at', type: 'date' },
+  updatedAt: { column: 'updated_at', type: 'date' }
 });
 
-module.exports = mongoose.model('Employee', employeeSchema);
+module.exports = Employee;
