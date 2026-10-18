@@ -5,6 +5,9 @@ const OilStock = require('./OilStock');
 const MachineryExpense = require('./MachineryExpense');
 const ElectricityExpense = require('./ElectricityExpense');
 const WeeklyPayroll = require('./WeeklyPayroll');
+const Customer = require('./Customer');
+const Invoice = require('./Invoice');
+const SalesPayment = require('./SalesPayment');
 
 module.exports = {
   Employee,
@@ -13,5 +16,9 @@ module.exports = {
   OilStock,
   MachineryExpense,
   ElectricityExpense,
-  WeeklyPayroll
+  WeeklyPayroll,
+  Customer,
+  Invoice,
+  SalesPayment
 };
+

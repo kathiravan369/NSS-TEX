@@ -209,3 +209,99 @@ ALTER TABLE electricity_expenses ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
 ALTER TABLE weekly_payroll ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(12,2) DEFAULT 0;
 ALTER TABLE weekly_payroll ADD COLUMN IF NOT EXISTS balance_amount NUMERIC(12,2) DEFAULT 0;
 ALTER TABLE weekly_payroll ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+
+-- Sales Module Tables
+CREATE TABLE IF NOT EXISTS customers (
+  id SERIAL PRIMARY KEY,
+  customer_id VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  customer_type VARCHAR(50) DEFAULT 'Business',
+  phone VARCHAR(50) NOT NULL,
+  alternate_phone VARCHAR(50) DEFAULT '',
+  email VARCHAR(255) DEFAULT '',
+  company_name VARCHAR(255) DEFAULT '',
+  gstin VARCHAR(50) DEFAULT '',
+  pan VARCHAR(50) DEFAULT '',
+  customer_category VARCHAR(50) DEFAULT 'Regular',
+  billing_address JSONB DEFAULT '{"addressLine":"","city":"","state":"","pincode":"","country":"India"}'::jsonb,
+  shipping_address JSONB DEFAULT '{"addressLine":"","city":"","state":"","pincode":"","country":"India"}'::jsonb,
+  same_as_billing BOOLEAN DEFAULT TRUE,
+  opening_balance NUMERIC(14,2) DEFAULT 0,
+  opening_balance_type VARCHAR(10) DEFAULT 'Debit',
+  credit_limit NUMERIC(14,2) DEFAULT 0,
+  payment_terms VARCHAR(50) DEFAULT '30 Days',
+  price_list VARCHAR(50) DEFAULT 'Standard',
+  notes TEXT DEFAULT '',
+  tags JSONB DEFAULT '[]'::jsonb,
+  status VARCHAR(20) DEFAULT 'Active',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_customers_customer_id ON customers(customer_id);
+CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_customers_gstin ON customers(gstin);
+CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status);
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id SERIAL PRIMARY KEY,
+  invoice_no VARCHAR(100) UNIQUE NOT NULL,
+  invoice_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  due_date DATE,
+  reference_no VARCHAR(100) DEFAULT '',
+  customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+  customer_code VARCHAR(50) DEFAULT '',
+  customer_name VARCHAR(255) DEFAULT '',
+  customer_snapshot JSONB DEFAULT '{}'::jsonb,
+  vehicle_no VARCHAR(50) DEFAULT '',
+  po_number VARCHAR(100) DEFAULT '',
+  challan_no VARCHAR(100) DEFAULT '',
+  delivery_date DATE,
+  salesperson VARCHAR(100) DEFAULT '',
+  dispatch_no VARCHAR(100) DEFAULT '',
+  items JSONB DEFAULT '[]'::jsonb,
+  subtotal NUMERIC(14,2) DEFAULT 0,
+  item_discount NUMERIC(14,2) DEFAULT 0,
+  extra_discount NUMERIC(14,2) DEFAULT 0,
+  taxable_amount NUMERIC(14,2) DEFAULT 0,
+  cgst_amount NUMERIC(14,2) DEFAULT 0,
+  sgst_amount NUMERIC(14,2) DEFAULT 0,
+  igst_amount NUMERIC(14,2) DEFAULT 0,
+  gst_amount NUMERIC(14,2) DEFAULT 0,
+  round_off NUMERIC(6,2) DEFAULT 0,
+  grand_total NUMERIC(14,2) DEFAULT 0,
+  amount_paid NUMERIC(14,2) DEFAULT 0,
+  balance_due NUMERIC(14,2) DEFAULT 0,
+  payment_status VARCHAR(30) DEFAULT 'Unpaid',
+  invoice_status VARCHAR(30) DEFAULT 'Draft',
+  notes TEXT DEFAULT '',
+  terms TEXT DEFAULT '',
+  bank_details JSONB DEFAULT '{"bankName":"State Bank of India","accountName":"NSS TOWELS & TEXTILES","accountNumber":"38920194829","ifscCode":"SBIN0001234","branch":"Coimbatore Main"}'::jsonb,
+  payments JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_invoices_invoice_no ON invoices(invoice_no);
+CREATE INDEX IF NOT EXISTS idx_invoices_invoice_date ON invoices(invoice_date);
+CREATE INDEX IF NOT EXISTS idx_invoices_customer_id ON invoices(customer_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_payment_status ON invoices(payment_status);
+CREATE INDEX IF NOT EXISTS idx_invoices_invoice_status ON invoices(invoice_status);
+
+CREATE TABLE IF NOT EXISTS sales_payments (
+  id SERIAL PRIMARY KEY,
+  invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
+  invoice_no VARCHAR(100) NOT NULL,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+  payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+  payment_mode VARCHAR(50) DEFAULT 'Bank Transfer',
+  reference VARCHAR(100) DEFAULT '',
+  notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_payments_invoice_id ON sales_payments(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_sales_payments_payment_date ON sales_payments(payment_date);
+

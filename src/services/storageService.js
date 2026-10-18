@@ -21,6 +21,31 @@ function setStorage(key, val) {
   }
 }
 
+// Ensure all ERP module caches are cleanly wiped on the client side for a fresh start
+if (typeof window !== 'undefined' && !localStorage.getItem('nsstowels_all_data_cleared_v1')) {
+  try {
+    const allKeys = [
+      'employees',
+      'threadGST',
+      'threadNoGST',
+      'oil',
+      'oilStock',
+      'machinery',
+      'electricity',
+      'weeklyPayroll',
+      'customers',
+      'invoices',
+      'salesPayments'
+    ];
+    allKeys.forEach(k => {
+      localStorage.removeItem(`nsstowels_${k}`);
+    });
+    localStorage.setItem('nsstowels_all_data_cleared_v1', 'true');
+  } catch (e) {
+    // Ignore storage access restrictions
+  }
+}
+
 // Safe ID generator for client-side storage
 function generateUniqueId() {
   return `rec_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
@@ -148,6 +173,12 @@ export const storageService = {
         case 'weeklyPayroll':
           res = await api.payroll.createWeekly(item);
           break;
+        case 'customers':
+          res = await api.sales.customers.create(item);
+          break;
+        case 'invoices':
+          res = await api.sales.invoices.create(item);
+          break;
         default:
           break;
       }
@@ -225,6 +256,12 @@ export const storageService = {
         case 'weeklyPayroll':
           await api.payroll.updateWeekly(syncId, merged);
           break;
+        case 'customers':
+          await api.sales.customers.update(syncId, merged);
+          break;
+        case 'invoices':
+          await api.sales.invoices.update(syncId, merged);
+          break;
         default:
           break;
       }
@@ -255,6 +292,12 @@ export const storageService = {
           break;
         case 'electricity':
           await api.electricity.delete(syncId);
+          break;
+        case 'customers':
+          await api.sales.customers.delete(syncId);
+          break;
+        case 'invoices':
+          await api.sales.invoices.delete(syncId);
           break;
         default:
           break;
@@ -294,6 +337,12 @@ export const storageService = {
           break;
         case 'weeklyPayroll':
           res = await api.payroll.getWeekly(params);
+          break;
+        case 'customers':
+          res = await api.sales.customers.getAll(params);
+          break;
+        case 'invoices':
+          res = await api.sales.invoices.getAll(params);
           break;
         default:
           return this.getCollection(key);
@@ -391,6 +440,34 @@ export const storageService = {
       productsProduced: 'Products Produced',
       status: 'Status',
       notes: 'Notes',
+      customerId: 'Customer ID',
+      customerName: 'Customer Name',
+      customerType: 'Customer Type',
+      companyName: 'Company Name',
+      gstin: 'GSTIN',
+      pan: 'PAN',
+      customerCategory: 'Customer Category',
+      openingBalance: 'Opening Balance (₹)',
+      creditLimit: 'Credit Limit (₹)',
+      paymentTerms: 'Payment Terms',
+      priceList: 'Price List',
+      invoiceStatus: 'Invoice Status',
+      paymentStatus: 'Payment Status',
+      referenceNo: 'Reference No',
+      vehicleNo: 'Vehicle No',
+      poNumber: 'PO Number',
+      challanNo: 'Challan No',
+      deliveryDate: 'Delivery Date',
+      salesperson: 'Salesperson',
+      dispatchNo: 'Dispatch No',
+      taxableAmount: 'Taxable Amount (₹)',
+      cgstAmount: 'CGST (₹)',
+      sgstAmount: 'SGST (₹)',
+      igstAmount: 'IGST (₹)',
+      roundOff: 'Round Off (₹)',
+      grandTotal: 'Grand Total (₹)',
+      amountReceived: 'Amount Received (₹)',
+      outstanding: 'Outstanding (₹)',
       createdAt: 'Created At',
       updatedAt: 'Updated At'
     };

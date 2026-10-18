@@ -103,6 +103,45 @@ export default function TopNav() {
         { label: 'Salary Reports', path: '/salary/reports' }
       ];
     }
+    if (path === '/sales/customers') {
+      return [
+        { label: 'Sales', path: '#' },
+        { label: 'Customer Details', path: '/sales/customers' }
+      ];
+    }
+    if (path === '/sales/invoices/new') {
+      return [
+        { label: 'Sales', path: '#' },
+        { label: 'Invoice Details', path: '/sales/invoices' },
+        { label: 'Create Invoice', path: '/sales/invoices/new' }
+      ];
+    }
+    if (path.startsWith('/sales/invoices/') && path.includes('/edit')) {
+      return [
+        { label: 'Sales', path: '#' },
+        { label: 'Invoice Details', path: '/sales/invoices' },
+        { label: 'Edit Invoice', path: '#' }
+      ];
+    }
+    if (path.startsWith('/sales/invoices/') && path !== '/sales/invoices') {
+      return [
+        { label: 'Sales', path: '#' },
+        { label: 'Invoice Details', path: '/sales/invoices' },
+        { label: 'View Invoice', path: '#' }
+      ];
+    }
+    if (path === '/sales/invoices') {
+      return [
+        { label: 'Sales', path: '#' },
+        { label: 'Invoice Details', path: '/sales/invoices' }
+      ];
+    }
+    if (path === '/sales/reports' || path === '/sales/details') {
+      return [
+        { label: 'Sales', path: '#' },
+        { label: 'Sales Details', path: '/sales/reports' }
+      ];
+    }
 
     return [{ label: 'Dashboard', path: '/' }];
   };

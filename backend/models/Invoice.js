@@ -1,0 +1,41 @@
+const PgModel = require('./PgModel');
+
+const Invoice = new PgModel('invoices', {
+  invoiceNo: { column: 'invoice_no', type: 'string' },
+  invoiceDate: { column: 'invoice_date', type: 'date' },
+  dueDate: { column: 'due_date', type: 'date' },
+  referenceNo: { column: 'reference_no', type: 'string' },
+  customerId: { column: 'customer_id', type: 'number' },
+  customerCode: { column: 'customer_code', type: 'string' },
+  customerName: { column: 'customer_name', type: 'string' },
+  customerSnapshot: { column: 'customer_snapshot', type: 'json' },
+  vehicleNo: { column: 'vehicle_no', type: 'string' },
+  poNumber: { column: 'po_number', type: 'string' },
+  challanNo: { column: 'challan_no', type: 'string' },
+  deliveryDate: { column: 'delivery_date', type: 'date' },
+  salesperson: { column: 'salesperson', type: 'string' },
+  dispatchNo: { column: 'dispatch_no', type: 'string' },
+  items: { column: 'items', type: 'json' },
+  subtotal: { column: 'subtotal', type: 'number' },
+  itemDiscount: { column: 'item_discount', type: 'number' },
+  extraDiscount: { column: 'extra_discount', type: 'number' },
+  taxableAmount: { column: 'taxable_amount', type: 'number' },
+  cgstAmount: { column: 'cgst_amount', type: 'number' },
+  sgstAmount: { column: 'sgst_amount', type: 'number' },
+  igstAmount: { column: 'igst_amount', type: 'number' },
+  gstAmount: { column: 'gst_amount', type: 'number' },
+  roundOff: { column: 'round_off', type: 'number' },
+  grandTotal: { column: 'grand_total', type: 'number' },
+  amountPaid: { column: 'amount_paid', type: 'number' },
+  balanceDue: { column: 'balance_due', type: 'number' },
+  paymentStatus: { column: 'payment_status', type: 'string' },
+  invoiceStatus: { column: 'invoice_status', type: 'string' },
+  notes: { column: 'notes', type: 'string' },
+  terms: { column: 'terms', type: 'string' },
+  bankDetails: { column: 'bank_details', type: 'json' },
+  payments: { column: 'payments', type: 'json' },
+  createdAt: { column: 'created_at', type: 'date' },
+  updatedAt: { column: 'updated_at', type: 'date' }
+});
+
+module.exports = Invoice;

@@ -258,6 +258,49 @@ body {
   color: #ffffff;
 }
 
+/* Master Navigation Groups (Purchases / Sales) */
+.nav-master-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  margin-top: 0.4rem;
+  margin-bottom: 0.25rem;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.nav-master-group:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.nav-master-group.active {
+  background: rgba(37, 99, 235, 0.18);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #60a5fa;
+}
+
+.master-submenu {
+  margin-left: 0.35rem;
+  padding-left: 0.65rem;
+  border-left: 1.5px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.5rem;
+  margin-top: 0.2rem;
+}
+
 .nested-submenu-item.active {
   color: #60a5fa;
   font-weight: 600;
@@ -1110,4 +1153,65 @@ textarea.form-control {
   outline: none;
   border-color: var(--primary-500);
 }
+
+/* Print Stylesheet for Tax Invoices and Reports */
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+  }
+
+  .sidebar,
+  .top-nav,
+  .no-print,
+  .btn,
+  .pagination-container,
+  .modal-overlay,
+  .modal-backdrop,
+  .toast-container {
+    display: none !important;
+  }
+
+  .app-container {
+    display: block !important;
+    height: auto !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .main-content,
+  .content-area {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  .invoice-print-container {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .erp-card {
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  .erp-table th,
+  .erp-table td {
+    border-color: #cbd5e1 !important;
+    color: #000000 !important;
+  }
+}
+
 

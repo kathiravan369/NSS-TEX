@@ -8,7 +8,10 @@ const runtimeStore = {
   oilStock: [],
   machineryExpenses: [],
   electricityExpenses: [],
-  weeklyPayroll: []
+  weeklyPayroll: [],
+  customers: [],
+  invoices: [],
+  salesPayments: []
 };
 
 module.exports = runtimeStore;

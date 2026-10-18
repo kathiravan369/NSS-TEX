@@ -255,7 +255,113 @@ export const api = {
     }
   },
 
-  // 9. Health & System
+  // 9. Sales Module Endpoints
+  sales: {
+    customers: {
+      getAll(params = {}) {
+        return request(`/sales/customers${buildQuery(params)}`);
+      },
+      getById(id) {
+        return request(`/sales/customers/${id}`);
+      },
+      getNextId() {
+        return request('/sales/customers/next-id');
+      },
+      checkDuplicate(params = {}) {
+        return request(`/sales/customers/check-duplicate${buildQuery(params)}`);
+      },
+      create(data) {
+        return request('/sales/customers', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+      },
+      update(id, data) {
+        return request(`/sales/customers/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data)
+        });
+      },
+      patchStatus(id, status) {
+        return request(`/sales/customers/${id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status })
+        });
+      },
+      delete(id) {
+        return request(`/sales/customers/${id}`, {
+          method: 'DELETE'
+        });
+      }
+    },
+    invoices: {
+      getAll(params = {}) {
+        return request(`/sales/invoices${buildQuery(params)}`);
+      },
+      getById(id) {
+        return request(`/sales/invoices/${id}`);
+      },
+      getNextNumber() {
+        return request('/sales/invoices/next-number');
+      },
+      calculate(data) {
+        return request('/sales/invoices/calculate', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+      },
+      create(data) {
+        return request('/sales/invoices', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+      },
+      update(id, data) {
+        return request(`/sales/invoices/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data)
+        });
+      },
+      recordPayment(id, paymentData) {
+        return request(`/sales/invoices/${id}/payments`, {
+          method: 'POST',
+          body: JSON.stringify(paymentData)
+        });
+      },
+      issue(id) {
+        return request(`/sales/invoices/${id}/issue`, {
+          method: 'PATCH'
+        });
+      },
+      delete(id) {
+        return request(`/sales/invoices/${id}`, {
+          method: 'DELETE'
+        });
+      }
+    },
+    reports: {
+      getSummary(params = {}) {
+        return request(`/sales/reports/summary${buildQuery(params)}`);
+      },
+      getCustomerWise(params = {}) {
+        return request(`/sales/reports/customer-wise${buildQuery(params)}`);
+      },
+      getProductWise(params = {}) {
+        return request(`/sales/reports/product-wise${buildQuery(params)}`);
+      },
+      getPeriodic(params = {}) {
+        return request(`/sales/reports/periodic${buildQuery(params)}`);
+      },
+      getOutstanding(params = {}) {
+        return request(`/sales/reports/outstanding${buildQuery(params)}`);
+      },
+      getGST(params = {}) {
+        return request(`/sales/reports/gst${buildQuery(params)}`);
+      }
+    }
+  },
+
+  // 10. Health & System
   health: {
     check() {
       return request('/health');

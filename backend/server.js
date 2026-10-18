@@ -20,6 +20,9 @@ const machineryRoutes = require('./routes/machineryRoutes');
 const electricityRoutes = require('./routes/electricityRoutes');
 const payrollRoutes = require('./routes/payrollRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const customerRoutes = require('./routes/customerRoutes');
+const invoiceRoutes = require('./routes/invoiceRoutes');
+const salesRoutes = require('./routes/salesRoutes');
 
 const PORT = process.env.PORT || 5001;
 const DB_NAME = process.env.PGDATABASE || 'nss_towels';
@@ -101,6 +104,10 @@ app.use('/api/electricity-expenses', electricityRoutes);
 app.use('/api/electricity', electricityRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/sales/customers', customerRoutes);
+app.use('/api/sales/invoices', invoiceRoutes);
+app.use('/api/sales/reports', salesRoutes);
+app.use('/api/sales', salesRoutes);
 
 // Centralized Error Handling
 app.use(errorHandler);

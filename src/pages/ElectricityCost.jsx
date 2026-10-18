@@ -58,7 +58,7 @@ export default function ElectricityCost() {
   const [toast, setToast] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [yearFilter, setYearFilter] = useState('2026');
+  const [yearFilter, setYearFilter] = useState('All Years');
   const [page, setPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -113,6 +113,20 @@ export default function ElectricityCost() {
     })).reverse();
   }, [items]);
 
+  // Available years for dropdown
+  const availableYears = useMemo(() => {
+    const years = new Set(['2026', '2025']);
+    items.forEach((item) => {
+      const match = item.month?.match(/\b(20\d\d)\b/);
+      if (match) years.add(match[1]);
+      if (item.billDate) {
+        const bdYear = item.billDate.split('-')[0] || item.billDate.split('-')[2];
+        if (bdYear && /^\d{4}$/.test(bdYear)) years.add(bdYear);
+      }
+    });
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [items]);
+
   // Filtered & Paginated
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -122,7 +136,9 @@ export default function ElectricityCost() {
         item.notes?.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesYear =
-        yearFilter === 'All Years' || item.month?.includes(yearFilter);
+        yearFilter === 'All Years' ||
+        item.month?.includes(yearFilter) ||
+        (item.billDate && item.billDate.includes(yearFilter));
 
       return matchesSearch && matchesYear;
     });
@@ -538,8 +554,11 @@ export default function ElectricityCost() {
               }}
             >
               <option value="All Years">All Years</option>
-              <option value="2026">2026</option>
-              <option value="2025">2025</option>
+              {availableYears.map((yr) => (
+                <option key={yr} value={yr}>
+                  {yr}
+                </option>
+              ))}
             </select>
 
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportCSV}>
