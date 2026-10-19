@@ -23,6 +23,7 @@ import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { storageService, cleanAccidentalDuplicates } from '../services/storageService';
 import {
   formatINR,
@@ -66,6 +67,8 @@ export default function ThreadPurchaseGST() {
   const [searchQuery, setSearchQuery] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('All Suppliers');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -178,9 +181,17 @@ export default function ThreadPurchaseGST() {
           ? isOverdue(item)
           : itemStatus === statusFilter;
 
-      return matchesSearch && matchesSupplier && matchesStatus;
+      let matchesDate = true;
+      if (startDate) {
+        matchesDate = matchesDate && item.date >= startDate;
+      }
+      if (endDate) {
+        matchesDate = matchesDate && item.date <= endDate;
+      }
+
+      return matchesSearch && matchesSupplier && matchesStatus && matchesDate;
     });
-  }, [items, searchQuery, supplierFilter, statusFilter]);
+  }, [items, searchQuery, supplierFilter, statusFilter, startDate, endDate]);
 
   // Sort items by S.No, Due Date, or Amount
   const sortedItems = useMemo(() => {
@@ -443,6 +454,10 @@ export default function ThreadPurchaseGST() {
   const handleExportCSV = () => {
     storageService.exportToCSV('Thread_Purchases_With_GST', sortedItems, columns);
     showToast('Exported Excel file successfully.');
+  };
+
+  const handleExportPDF = () => {
+    storageService.exportToPDF('Thread_Purchases_With_GST', sortedItems, columns);
   };
 
   return (
@@ -969,6 +984,26 @@ export default function ThreadPurchaseGST() {
                 Supplier: {supplierFilter} ✕
               </span>
             )}
+            {startDate && (
+              <span
+                onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
+                style={{
+                  fontSize: '0.725rem',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '9999px',
+                  backgroundColor: '#ccfbf1',
+                  color: '#0f766e',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}
+                title="Click to clear date filter"
+              >
+                Date: {startDate}{endDate ? ` to ${endDate}` : ''} ✕
+              </span>
+            )}
           </div>
 
           {/* Table Controls */}
@@ -1028,11 +1063,26 @@ export default function ThreadPurchaseGST() {
               <option value="Overdue">Overdue ({metrics.overdueCount})</option>
             </select>
 
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setPage(1);
+              }}
+              onReset={() => {
+                setStartDate('');
+                setEndDate('');
+                setPage(1);
+              }}
+            />
+
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportCSV}>
               <Download size={14} /> Export Excel
             </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>
-              <Printer size={14} /> Print
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportPDF}>
+              <Printer size={14} /> Export PDF
             </button>
           </div>
         </div>

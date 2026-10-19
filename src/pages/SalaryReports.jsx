@@ -33,6 +33,7 @@ import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { storageService } from '../services/storageService';
 import { api } from '../services/api';
 import { formatINR, formatDate, formatDateTime } from '../utils/formatters';
@@ -41,6 +42,8 @@ export default function SalaryReports() {
   const [selectedMonth, setSelectedMonth] = useState('October');
   const [selectedYear, setSelectedYear] = useState('2026');
   const [employeeFilter, setEmployeeFilter] = useState('All Employees');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [viewingItem, setViewingItem] = useState(null);
   const [toast, setToast] = useState(null);
   const [reportData, setReportData] = useState(null);
@@ -80,7 +83,20 @@ export default function SalaryReports() {
   const fallbackReport = useMemo(() => {
     return employees.map((emp) => {
       const isDay = emp.type === 'Day Salary';
-      const empPayrolls = weeklyPayroll.filter(p => p.empId === emp.empId);
+      let empPayrolls = weeklyPayroll.filter(p => p.empId === emp.empId);
+
+      if (startDate) {
+        empPayrolls = empPayrolls.filter(p => {
+          const d = p.workDate || p.weekEnd || p.date || '';
+          return d >= startDate;
+        });
+      }
+      if (endDate) {
+        empPayrolls = empPayrolls.filter(p => {
+          const d = p.workDate || p.weekEnd || p.date || '';
+          return d <= endDate;
+        });
+      }
       
       const daysWorked = empPayrolls.reduce((sum, p) => sum + (Number(p.daysWorked) || 0), 0);
       const leaveDays = empPayrolls.reduce((sum, p) => sum + (Number(p.leaveDays) || 0), 0);
@@ -142,7 +158,28 @@ export default function SalaryReports() {
   };
 
   const handlePrint = () => {
-    window.print();
+    storageService.exportToPDF(`Monthly_Salary_Report_${selectedMonth}_${selectedYear}`, rows, columns);
+  };
+
+  const handlePrintPayslip = (item) => {
+    if (!item) return;
+    const payslipRows = [
+      { field: 'Employee ID', value: item.empId },
+      { field: 'Employee Name', value: item.name },
+      { field: 'Work Type', value: item.type },
+      { field: 'Days Worked', value: item.daysWorked },
+      { field: 'Products Produced', value: item.productsProduced || 0 },
+      { field: 'Daily Rate', value: formatINR(item.dailyRate) },
+      { field: 'Gross Earnings', value: formatINR(item.grossEarnings) },
+      { field: 'Advances / Deductions', value: formatINR(item.advances) },
+      { field: 'Net Payable Salary', value: formatINR(item.netSalary) },
+      { field: 'Month & Year', value: `${selectedMonth} ${selectedYear}` }
+    ];
+    const payslipCols = [
+      { key: 'field', header: 'Payslip Component' },
+      { key: 'value', header: 'Details' }
+    ];
+    storageService.exportToPDF(`Employee_Payslip_${item.empId}_${selectedMonth}_${selectedYear}`, payslipRows, payslipCols);
   };
 
   const columns = [
@@ -232,7 +269,7 @@ export default function SalaryReports() {
             <Download size={16} /> Export Excel
           </button>
           <button onClick={handlePrint} className="btn btn-primary">
-            <Printer size={16} /> Print Report
+            <Printer size={16} /> Export PDF
           </button>
         </div>
       </div>
@@ -289,20 +326,6 @@ export default function SalaryReports() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Year:</label>
-              <select
-                className="input"
-                style={{ width: '100px', padding: '0.4rem 0.6rem' }}
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-              >
-                {['2024', '2025', '2026', '2027'].map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Filter size={16} color="var(--text-muted)" />
               <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Work Type:</label>
               <select
@@ -316,6 +339,19 @@ export default function SalaryReports() {
                 <option value="Count Salary">Count Salary Only</option>
               </select>
             </div>
+
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+              }}
+              onReset={() => {
+                setStartDate('');
+                setEndDate('');
+              }}
+            />
           </div>
 
           <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
@@ -556,7 +592,7 @@ export default function SalaryReports() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <button onClick={() => window.print()} className="btn btn-secondary">
+              <button onClick={() => handlePrintPayslip(viewingItem)} className="btn btn-secondary">
                 <Printer size={16} /> Print Payslip
               </button>
               <button onClick={() => setViewingItem(null)} className="btn btn-primary">

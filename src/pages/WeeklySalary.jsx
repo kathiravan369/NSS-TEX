@@ -24,6 +24,7 @@ import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { storageService } from '../services/storageService';
 import { formatINR, formatDate, formatDateTime } from '../utils/formatters';
 
@@ -79,6 +80,8 @@ export default function WeeklySalary() {
   const [weekStart, setWeekStart] = useState('2026-10-08');
   const [weekEnd, setWeekEnd] = useState('2026-10-14');
   const [workTypeFilter, setWorkTypeFilter] = useState('All');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [dateFilter, setDateFilter] = useState('All Time'); // 'All Time' | 'Today' | 'This Week' | 'This Month' | 'This Year' | 'Custom Day' | 'Custom Range'
   const [customSingleDate, setCustomSingleDate] = useState(new Date().toISOString().split('T')[0]);
   const [customStartDate, setCustomStartDate] = useState('');
@@ -204,57 +207,18 @@ export default function WeeklySalary() {
       if (!matchesSearch || !matchesType) return false;
 
       // Date Filtering
-      const recDate = parseDateSafe(item.workDate || item.weekEnd || item.weekStart || item.createdAt || item.date);
+      const recDateStr = (item.workDate ? item.workDate.split('T')[0] : '') ||
+                         (item.weekEnd ? item.weekEnd.split('T')[0] : '') ||
+                         (item.weekStart ? item.weekStart.split('T')[0] : '') ||
+                         (item.date ? item.date.split('T')[0] : '') ||
+                         (item.createdAt ? item.createdAt.split('T')[0] : '') || '';
 
-      if (dateFilter === 'Today') {
-        if (!recDate) return false;
-        if (
-          recDate.getFullYear() !== todayYear ||
-          recDate.getMonth() !== todayMonth ||
-          recDate.getDate() !== todayDate
-        ) {
-          return false;
-        }
-      } else if (dateFilter === 'This Week') {
-        if (!recDate || recDate < startOfWeek || recDate > endOfWeek) {
-          return false;
-        }
-      } else if (dateFilter === 'This Month') {
-        if (!recDate || recDate.getMonth() !== todayMonth || recDate.getFullYear() !== todayYear) {
-          return false;
-        }
-      } else if (dateFilter === 'This Year') {
-        if (!recDate || recDate.getFullYear() !== todayYear) {
-          return false;
-        }
-      } else if (dateFilter === 'Custom Day') {
-        if (customSingleDate) {
-          const [cy, cm, cd] = customSingleDate.split('-').map(Number);
-          if (
-            !recDate ||
-            recDate.getFullYear() !== cy ||
-            recDate.getMonth() !== cm - 1 ||
-            recDate.getDate() !== cd
-          ) {
-            return false;
-          }
-        }
-      } else if (dateFilter === 'Custom Range') {
-        if (customStartDate) {
-          const [sy, sm, sd] = customStartDate.split('-').map(Number);
-          const startD = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
-          if (!recDate || recDate < startD) return false;
-        }
-        if (customEndDate) {
-          const [ey, em, ed] = customEndDate.split('-').map(Number);
-          const endD = new Date(ey, em - 1, ed, 23, 59, 59, 999);
-          if (!recDate || recDate > endD) return false;
-        }
-      }
+      if (startDate && recDateStr && recDateStr < startDate) return false;
+      if (endDate && recDateStr && recDateStr > endDate) return false;
 
       return true;
     });
-  }, [items, searchQuery, workTypeFilter, dateFilter, customSingleDate, customStartDate, customEndDate]);
+  }, [items, searchQuery, workTypeFilter, startDate, endDate]);
 
   // Summary Metrics for Bottom Bar (dynamically matches active filters)
   const summary = useMemo(() => {
@@ -784,6 +748,10 @@ export default function WeeklySalary() {
     showToast('Weekly salary spreadsheet exported.');
   };
 
+  const handleExportPDF = () => {
+    storageService.exportToPDF(`Weekly_Salary_${weekStart}_to_${weekEnd}`, sortedItems, columns);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <Toast toast={toast} onClose={() => setToast(null)} />
@@ -801,8 +769,8 @@ export default function WeeklySalary() {
           <button className="btn btn-secondary btn-sm" onClick={handleExportCSV}>
             <Download size={14} /> Export Excel
           </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
-            <Printer size={14} /> Print Payslips
+          <button className="btn btn-secondary btn-sm" onClick={handleExportPDF}>
+            <Printer size={14} /> Export PDF
           </button>
         </div>
       </div>
@@ -810,9 +778,29 @@ export default function WeeklySalary() {
       {/* --- WEEKLY PAYROLL HISTORY GRID (Lister) --- */}
       <div className="erp-card">
         <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div className="card-title-group">
+          <div className="card-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <Calendar size={18} color="var(--primary-600)" />
             <h3 className="card-title">Employee Weekly Work & Payroll Grid</h3>
+            {startDate && (
+              <span
+                onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
+                style={{
+                  fontSize: '0.725rem',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '9999px',
+                  backgroundColor: '#ccfbf1',
+                  color: '#0f766e',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}
+                title="Click to clear date filter"
+              >
+                Date: {startDate}{endDate ? ` to ${endDate}` : ''} ✕
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
@@ -843,143 +831,22 @@ export default function WeeklySalary() {
               <option value="Count Based Salary">Count Based Salary</option>
               <option value="Day Salary">Day Salary</option>
             </select>
-          </div>
-        </div>
 
-        {/* Date Filter Bar */}
-        <div
-          style={{
-            padding: '0.6rem 1.25rem',
-            borderBottom: '1px solid var(--border-color)',
-            backgroundColor: '#f8fafc',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Filter size={13} color="var(--primary-600)" />
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>
-                Date Filter:
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-              {[
-                { id: 'Today', label: 'Today' },
-                { id: 'This Week', label: 'This Week' },
-                { id: 'This Month', label: 'This Month' },
-                { id: 'This Year', label: 'This Year' },
-                { id: 'Custom Day', label: 'Custom Day' },
-                { id: 'Custom Range', label: 'Custom Range' },
-                { id: 'All Time', label: 'All Time' }
-              ].map((p) => {
-                const isActive = dateFilter === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => {
-                      setDateFilter(p.id);
-                      setPage(1);
-                    }}
-                    style={{
-                      padding: '3px 8px',
-                      borderRadius: '4px',
-                      fontSize: '0.72rem',
-                      fontWeight: isActive ? 700 : 500,
-                      border: isActive ? '1px solid var(--primary-600)' : '1px solid #cbd5e1',
-                      backgroundColor: isActive ? 'var(--primary-50)' : '#ffffff',
-                      color: isActive ? 'var(--primary-600)' : '#475569',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {dateFilter === 'Custom Day' && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.65rem',
-                backgroundColor: '#ffffff',
-                padding: '0.45rem 0.75rem',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid #bae6fd',
-                width: 'fit-content'
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setPage(1);
               }}
-            >
-              <CalendarDays size={14} color="#0284c7" />
-              <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#0369a1', margin: 0 }}>
-                Select Specific Day:
-              </label>
-              <input
-                type="date"
-                className="form-control"
-                style={{ height: '30px', fontSize: '0.75rem', width: '140px' }}
-                value={customSingleDate}
-                onChange={(e) => {
-                  setCustomSingleDate(e.target.value);
-                  setPage(1);
-                }}
-              />
-              {customSingleDate && (
-                <span style={{ fontSize: '0.72rem', color: '#0369a1', fontWeight: 600 }}>
-                  Showing records for: {formatDate(customSingleDate)}
-                </span>
-              )}
-            </div>
-          )}
-
-          {dateFilter === 'Custom Range' && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                backgroundColor: '#ffffff',
-                padding: '0.45rem 0.75rem',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid #e2e8f0',
-                width: 'fit-content',
-                flexWrap: 'wrap'
+              onReset={() => {
+                setStartDate('');
+                setEndDate('');
+                setPage(1);
               }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', margin: 0 }}>From:</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  style={{ height: '30px', fontSize: '0.75rem', width: '135px' }}
-                  value={customStartDate}
-                  onChange={(e) => {
-                    setCustomStartDate(e.target.value);
-                    setPage(1);
-                  }}
-                />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', margin: 0 }}>To:</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  style={{ height: '30px', fontSize: '0.75rem', width: '135px' }}
-                  value={customEndDate}
-                  onChange={(e) => {
-                    setCustomEndDate(e.target.value);
-                    setPage(1);
-                  }}
-                />
-              </div>
-            </div>
-          )}
+            />
+          </div>
         </div>
 
         <DataTable

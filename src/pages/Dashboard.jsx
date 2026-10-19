@@ -37,6 +37,7 @@ import {
 } from 'recharts';
 import MetricCard from '../components/common/MetricCard';
 import StatusBadge from '../components/common/StatusBadge';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { dashboardService } from '../services/dashboardService';
 import { formatINR } from '../utils/formatters';
 
@@ -47,6 +48,8 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [trendYear, setTrendYear] = useState(new Date().getFullYear().toString());
   const [statsPeriod, setStatsPeriod] = useState('This Month');
+  const [tableStartDate, setTableStartDate] = useState('');
+  const [tableEndDate, setTableEndDate] = useState('');
 
   const loadData = async (year = trendYear, period = statsPeriod) => {
     setLoading(true);
@@ -397,14 +400,28 @@ export default function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr', gap: '1.25rem' }}>
         {/* Left: Recent Expense Transactions Table */}
         <div className="erp-card">
-          <div className="card-header">
-            <div className="card-title-group">
+          <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.65rem' }}>
+            <div className="card-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <FileText size={18} color="var(--primary-600)" />
               <h3 className="card-title">Recent Transactions</h3>
             </div>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/raw-materials/thread-gst')}>
-              View All
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <DateRangePicker
+                startDate={tableStartDate}
+                endDate={tableEndDate}
+                onChange={({ startDate: s, endDate: e }) => {
+                  setTableStartDate(s);
+                  setTableEndDate(e);
+                }}
+                onReset={() => {
+                  setTableStartDate('');
+                  setTableEndDate('');
+                }}
+              />
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate('/raw-materials/thread-gst')}>
+                View All
+              </button>
+            </div>
           </div>
 
           <div className="table-responsive">
@@ -420,14 +437,24 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {recentTransactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
-                      No transactions recorded yet. Click "Add Raw Material" or "Add Expense" above to add your first entry.
-                    </td>
-                  </tr>
-                ) : (
-                  recentTransactions.map((tx) => (
+                {(() => {
+                  const filtered = (recentTransactions || []).filter((tx) => {
+                    if (tableStartDate && tx.date && tx.date < tableStartDate) return false;
+                    if (tableEndDate && tx.date && tx.date > tableEndDate) return false;
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                          No transactions found for the selected criteria.
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filtered.map((tx) => (
                     <tr key={tx.id || Math.random()}>
                       <td>{tx.date}</td>
                       <td><strong style={{ fontSize: '0.78rem' }}>{tx.category}</strong></td>
@@ -436,8 +463,8 @@ export default function Dashboard() {
                       <td><strong>{formatINR(tx.amount || 0)}</strong></td>
                       <td><StatusBadge status={tx.status} /></td>
                     </tr>
-                  ))
-                )}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
@@ -452,16 +479,6 @@ export default function Dashboard() {
                 <TrendingUp size={16} color="var(--primary-600)" />
                 <h3 className="card-title">Monthly Expense Trend</h3>
               </div>
-              <select
-                className="form-control"
-                style={{ width: '85px', height: '28px', fontSize: '0.75rem', padding: '0 0.4rem' }}
-                value={trendYear}
-                onChange={(e) => setTrendYear(e.target.value)}
-              >
-                <option value="2026">2026</option>
-                <option value="2025">2025</option>
-                <option value="2024">2024</option>
-              </select>
             </div>
 
             <div style={{ width: '100%', height: 150 }}>

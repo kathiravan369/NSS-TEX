@@ -25,6 +25,7 @@ import MetricCard from '../components/common/MetricCard';
 import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { storageService } from '../services/storageService';
 import { api } from '../services/api';
 import { formatINR, formatDate } from '../utils/formatters';
@@ -201,6 +202,10 @@ export default function InvoiceList() {
     showToast('Exported Invoices list to Excel.');
   };
 
+  const handleExportPDF = () => {
+    storageService.exportToPDF('Invoices_Report', filteredInvoices, columns);
+  };
+
   const columns = [
     {
       key: 'id',
@@ -351,8 +356,8 @@ export default function InvoiceList() {
           <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportCSV}>
             <Download size={14} /> Export Excel
           </button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>
-            <Printer size={14} /> Print
+          <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportPDF}>
+            <Printer size={14} /> Export PDF
           </button>
           <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/sales/invoices/new')}>
             <Plus size={15} /> Create Invoice
@@ -463,28 +468,19 @@ export default function InvoiceList() {
             <option value="Overdue">Overdue</option>
           </select>
 
-          <input
-            type="date"
-            className="form-control"
-            style={{ width: '135px', height: '36px', fontSize: '0.78rem' }}
-            value={startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value);
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onChange={({ startDate: s, endDate: e }) => {
+              setStartDate(s);
+              setEndDate(e);
               setPage(1);
             }}
-            title="Start Date"
-          />
-
-          <input
-            type="date"
-            className="form-control"
-            style={{ width: '135px', height: '36px', fontSize: '0.78rem' }}
-            value={endDate}
-            onChange={(e) => {
-              setEndDate(e.target.value);
+            onReset={() => {
+              setStartDate('');
+              setEndDate('');
               setPage(1);
             }}
-            title="End Date"
           />
 
           <button

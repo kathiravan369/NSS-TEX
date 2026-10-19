@@ -17,6 +17,7 @@ import {
   Plus
 } from 'lucide-react';
 import { storageService } from '../services/storageService';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { formatINR, formatDate } from '../utils/formatters';
 
 const MONTH_NAMES = [
@@ -81,6 +82,8 @@ export default function WeeklySalaryReport() {
 
   const [selectedMonth, setSelectedMonth] = useState(MONTH_NAMES[currentMonthIdx] || 'October');
   const [selectedYear, setSelectedYear] = useState(currentYearNum || 2026);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [payrollRecords, setPayrollRecords] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [selectedWedDateISO, setSelectedWedDateISO] = useState(null);
@@ -198,7 +201,16 @@ export default function WeeklySalaryReport() {
         employees: employeeList
       };
     });
-  }, [wednesdays, payrollRecords, employees]);
+
+    if (startDate) {
+      list = list.filter(w => w.dateISO >= startDate);
+    }
+    if (endDate) {
+      list = list.filter(w => w.dateISO <= endDate);
+    }
+
+    return list;
+  }, [wednesdays, payrollRecords, employees, startDate, endDate]);
 
   // Set default active Wednesday: first Wednesday with real records, or first Wednesday
   useEffect(() => {
@@ -258,6 +270,31 @@ export default function WeeklySalaryReport() {
     storageService.exportToCSV(`Weekly_Salary_Report_${activeReport.dateISO}`, rows);
   };
 
+  const handleExportPDF = () => {
+    if (!activeReport) return;
+    const rows = activeReport.employees.map((e, idx) => ({
+      sno: idx + 1,
+      empNo: e.empNo,
+      name: e.name,
+      typeOfSalary: e.type,
+      totalWorkingDays: e.workingDays,
+      presentDays: e.presentDays,
+      leaveDays: e.leaveDays,
+      totalSalary: e.totalSalary
+    }));
+    const reportCols = [
+      { key: 'sno', header: 'S.No', width: '50px' },
+      { key: 'empNo', header: 'Emp No' },
+      { key: 'name', header: 'Employee Name' },
+      { key: 'typeOfSalary', header: 'Type of Salary' },
+      { key: 'totalWorkingDays', header: 'Total Working Days' },
+      { key: 'presentDays', header: 'Present Days' },
+      { key: 'leaveDays', header: 'Leave Days' },
+      { key: 'totalSalary', header: 'Total Salary (₹)' }
+    ];
+    storageService.exportToPDF(`Weekly_Salary_Report_${activeReport.dateISO}`, rows, reportCols);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
       {/* 1. Breadcrumbs */}
@@ -295,20 +332,28 @@ export default function WeeklySalaryReport() {
             ))}
           </select>
 
-          {/* Year Selector */}
-          <select
-            className="form-control"
-            style={{ width: '100px', height: '36px', fontSize: '0.82rem', fontWeight: 600 }}
-            value={selectedYear}
-            onChange={(e) => {
-              setSelectedYear(Number(e.target.value));
-              setSelectedWedDateISO(null);
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onChange={({ startDate: s, endDate: e }) => {
+              setStartDate(s);
+              setEndDate(e);
+              if (s) {
+                const parts = s.split('-');
+                if (parts[1]) {
+                  const mName = MONTH_NAMES[Number(parts[1]) - 1];
+                  if (mName) setSelectedMonth(mName);
+                }
+                if (parts[0]) {
+                  setSelectedYear(Number(parts[0]));
+                }
+              }
             }}
-          >
-            {[2024, 2025, 2026, 2027].map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+            onReset={() => {
+              setStartDate('');
+              setEndDate('');
+            }}
+          />
 
           <button
             type="button"
@@ -321,10 +366,10 @@ export default function WeeklySalaryReport() {
           <button
             type="button"
             className="btn btn-secondary btn-sm"
-            onClick={() => window.print()}
+            onClick={handleExportPDF}
             style={{ height: '36px', fontSize: '0.8rem' }}
           >
-            <Printer size={14} /> Print
+            <Printer size={14} /> Export PDF
           </button>
         </div>
       </div>

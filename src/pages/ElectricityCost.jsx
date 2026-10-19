@@ -31,6 +31,7 @@ import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { storageService } from '../services/storageService';
 import { formatINR, formatDate, formatDateTime, isPaidLocked } from '../utils/formatters';
 
@@ -58,7 +59,8 @@ export default function ElectricityCost() {
   const [toast, setToast] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [yearFilter, setYearFilter] = useState('All Years');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -113,20 +115,6 @@ export default function ElectricityCost() {
     })).reverse();
   }, [items]);
 
-  // Available years for dropdown
-  const availableYears = useMemo(() => {
-    const years = new Set(['2026', '2025']);
-    items.forEach((item) => {
-      const match = item.month?.match(/\b(20\d\d)\b/);
-      if (match) years.add(match[1]);
-      if (item.billDate) {
-        const bdYear = item.billDate.split('-')[0] || item.billDate.split('-')[2];
-        if (bdYear && /^\d{4}$/.test(bdYear)) years.add(bdYear);
-      }
-    });
-    return Array.from(years).sort((a, b) => b.localeCompare(a));
-  }, [items]);
-
   // Filtered & Paginated
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -135,14 +123,18 @@ export default function ElectricityCost() {
         item.month?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.notes?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesYear =
-        yearFilter === 'All Years' ||
-        item.month?.includes(yearFilter) ||
-        (item.billDate && item.billDate.includes(yearFilter));
+      let matchesDate = true;
+      const itemDate = item.billDate || item.date || item.dueDate || '';
+      if (startDate) {
+        matchesDate = matchesDate && itemDate >= startDate;
+      }
+      if (endDate) {
+        matchesDate = matchesDate && itemDate <= endDate;
+      }
 
-      return matchesSearch && matchesYear;
+      return matchesSearch && matchesDate;
     });
-  }, [items, searchQuery, yearFilter]);
+  }, [items, searchQuery, startDate, endDate]);
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const paginatedItems = filteredItems.slice((page - 1) * itemsPerPage, page * itemsPerPage);
@@ -273,6 +265,10 @@ export default function ElectricityCost() {
   const handleExportCSV = () => {
     storageService.exportToCSV('Electricity_Bill_History', filteredItems, columns);
     showToast('Exported Excel file successfully.');
+  };
+
+  const handleExportPDF = () => {
+    storageService.exportToPDF('Electricity_Bill_History', filteredItems, columns);
   };
 
   return (
@@ -515,9 +511,29 @@ export default function ElectricityCost() {
       {/* History Table */}
       <div className="erp-card">
         <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div className="card-title-group">
+          <div className="card-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <FileText size={18} color="var(--primary-600)" />
             <h3 className="card-title">Electricity Bill History</h3>
+            {startDate && (
+              <span
+                onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
+                style={{
+                  fontSize: '0.725rem',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '9999px',
+                  backgroundColor: '#ccfbf1',
+                  color: '#0f766e',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}
+                title="Click to clear date filter"
+              >
+                Date: {startDate}{endDate ? ` to ${endDate}` : ''} ✕
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
@@ -544,27 +560,25 @@ export default function ElectricityCost() {
               />
             </div>
 
-            <select
-              className="form-control"
-              style={{ width: '120px', height: '34px', fontSize: '0.78rem' }}
-              value={yearFilter}
-              onChange={(e) => {
-                setYearFilter(e.target.value);
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
                 setPage(1);
               }}
-            >
-              <option value="All Years">All Years</option>
-              {availableYears.map((yr) => (
-                <option key={yr} value={yr}>
-                  {yr}
-                </option>
-              ))}
-            </select>
+              onReset={() => {
+                setStartDate('');
+                setEndDate('');
+                setPage(1);
+              }}
+            />
 
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportCSV}>
               <Download size={14} /> Export Excel
             </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportPDF}>
               <Printer size={14} /> Export PDF
             </button>
           </div>

@@ -24,6 +24,7 @@ import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { storageService } from '../services/storageService';
 import {
   formatINR,
@@ -71,6 +72,8 @@ export default function OilPurchase() {
   const [supplierFilter, setSupplierFilter] = useState('All Suppliers');
   const [typeFilter, setTypeFilter] = useState('All Types');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -186,9 +189,17 @@ export default function OilPurchase() {
           ? isOverdue(item)
           : itemStatus === statusFilter;
 
-      return matchesSearch && matchesType && matchesSupplier && matchesStatus;
+      let matchesDate = true;
+      if (startDate) {
+        matchesDate = matchesDate && item.date >= startDate;
+      }
+      if (endDate) {
+        matchesDate = matchesDate && item.date <= endDate;
+      }
+
+      return matchesSearch && matchesType && matchesSupplier && matchesStatus && matchesDate;
     });
-  }, [items, searchQuery, typeFilter, supplierFilter, statusFilter]);
+  }, [items, searchQuery, typeFilter, supplierFilter, statusFilter, startDate, endDate]);
 
   // Sort items by S.No, Due Date, or Amount
   const sortedItems = useMemo(() => {
@@ -490,6 +501,10 @@ export default function OilPurchase() {
   const handleExportCSV = () => {
     storageService.exportToCSV('Oil_Purchase_History', sortedItems, columns);
     showToast('Exported Excel file successfully.');
+  };
+
+  const handleExportPDF = () => {
+    storageService.exportToPDF('Oil_Purchase_History', sortedItems, columns);
   };
 
   return (
@@ -1004,17 +1019,32 @@ export default function OilPurchase() {
               <option value="Compressor Oil">Compressor Oil</option>
             </select>
 
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setPage(1);
+              }}
+              onReset={() => {
+                setStartDate('');
+                setEndDate('');
+                setPage(1);
+              }}
+            />
+
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportCSV}>
               <Download size={14} /> Export Excel
             </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportPDF}>
               <Printer size={14} /> Export PDF
             </button>
           </div>
         </div>
 
         {/* Active Filter Indicator Chips */}
-        {(supplierFilter !== 'All Suppliers' || statusFilter !== 'All' || typeFilter !== 'All Types' || searchQuery) && (
+        {(supplierFilter !== 'All Suppliers' || statusFilter !== 'All' || typeFilter !== 'All Types' || searchQuery || startDate || endDate) && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -1044,6 +1074,12 @@ export default function OilPurchase() {
                 <X size={12} style={{ cursor: 'pointer' }} onClick={() => setStatusFilter('All')} />
               </span>
             )}
+            {startDate && (
+              <span className="badge" style={{ backgroundColor: '#ccfbf1', color: '#0f766e', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                Date: {startDate}{endDate ? ` to ${endDate}` : ''}
+                <X size={12} style={{ cursor: 'pointer' }} onClick={() => { setStartDate(''); setEndDate(''); }} />
+              </span>
+            )}
             {searchQuery && (
               <span className="badge badge-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                 Search: "{searchQuery}"
@@ -1059,6 +1095,8 @@ export default function OilPurchase() {
                 setTypeFilter('All Types');
                 setStatusFilter('All');
                 setSearchQuery('');
+                setStartDate('');
+                setEndDate('');
               }}
             >
               Clear All Filters

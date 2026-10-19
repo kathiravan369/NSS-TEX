@@ -23,6 +23,7 @@ import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { storageService, cleanAccidentalDuplicates } from '../services/storageService';
 import {
   formatINR,
@@ -69,6 +70,8 @@ export default function MachineryCost() {
   const [machineFilter, setMachineFilter] = useState('All Machines');
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [sortField, setSortField] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
   const [page, setPage] = useState(1);
@@ -198,9 +201,17 @@ export default function MachineryCost() {
           ? isOverdue(item)
           : itemStatus === statusFilter;
 
-      return matchesSearch && matchesMachine && matchesCategory && matchesStatus;
+      let matchesDate = true;
+      if (startDate) {
+        matchesDate = matchesDate && item.date >= startDate;
+      }
+      if (endDate) {
+        matchesDate = matchesDate && item.date <= endDate;
+      }
+
+      return matchesSearch && matchesMachine && matchesCategory && matchesStatus && matchesDate;
     });
-  }, [items, searchQuery, machineFilter, categoryFilter, statusFilter]);
+  }, [items, searchQuery, machineFilter, categoryFilter, statusFilter, startDate, endDate]);
 
   const sortedItems = useMemo(() => {
     const indexed = filteredItems.map((item, index) => ({
@@ -477,6 +488,10 @@ export default function MachineryCost() {
   const handleExportCSV = () => {
     storageService.exportToCSV('Machinery_Expense_History', sortedItems, columns);
     showToast('Exported Excel file successfully.');
+  };
+
+  const handleExportPDF = () => {
+    storageService.exportToPDF('Machinery_Expense_History', sortedItems, columns);
   };
 
   return (
@@ -954,6 +969,26 @@ export default function MachineryCost() {
                 Showing {statusFilter} ✕
               </span>
             )}
+            {startDate && (
+              <span
+                onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
+                style={{
+                  fontSize: '0.725rem',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '9999px',
+                  backgroundColor: '#ccfbf1',
+                  color: '#0f766e',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}
+                title="Click to clear date filter"
+              >
+                Date: {startDate}{endDate ? ` to ${endDate}` : ''} ✕
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
@@ -1029,10 +1064,25 @@ export default function MachineryCost() {
               <option value="Overdue">Overdue ({metrics.overdueCount})</option>
             </select>
 
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setPage(1);
+              }}
+              onReset={() => {
+                setStartDate('');
+                setEndDate('');
+                setPage(1);
+              }}
+            />
+
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportCSV}>
               <Download size={14} /> Export Excel
             </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportPDF}>
               <Printer size={14} /> Export PDF
             </button>
           </div>

@@ -137,7 +137,7 @@ export default function DataTable({
                 );
               })}
               {(onView || onEdit || onDelete) && (
-                <th style={{ textAlign: 'center', width: '100px' }}>Actions</th>
+                <th className="table-actions-col" style={{ textAlign: 'center', width: '100px' }}>Actions</th>
               )}
             </tr>
           </thead>
@@ -193,7 +193,7 @@ export default function DataTable({
                       );
                     })}
                     {(onView || onEdit || onDelete) && (
-                      <td style={{ textAlign: 'center' }}>
+                      <td className="table-actions-col" style={{ textAlign: 'center' }}>
                         <div className="table-actions" style={{ justifyContent: 'center' }}>
                           {onView && (
                             <button
@@ -261,6 +261,7 @@ export default function DataTable({
 
       {/* Pagination Footer Matching Provided Image */}
       <div
+        className="pagination-container"
         style={{
           display: 'flex',
           alignItems: 'center',

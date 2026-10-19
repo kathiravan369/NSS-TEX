@@ -1154,64 +1154,143 @@ textarea.form-control {
   border-color: var(--primary-500);
 }
 
-/* Print Stylesheet for Tax Invoices and Reports */
+/* Print Stylesheet for Tax Invoices and Reports — ONLY Table Data Shown */
 @media print {
   @page {
-    size: A4;
-    margin: 10mm;
+    size: auto;
+    margin: 8mm 6mm;
   }
 
   body {
     background-color: #ffffff !important;
-    color: #000000 !important;
+    color: #0f172a !important;
     overflow: visible !important;
+    font-size: 11px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
+  /* Exclude All UI Chrome, Headers, KPI Metric Cards, Filters, Search, Tabs, Charts, and Pagination */
   .sidebar,
   .top-nav,
   .no-print,
   .btn,
+  button:not(.invoice-print-container button),
+  .page-header,
+  .page-title,
+  .page-subtitle,
+  .date-pill,
+  .kpi-grid,
+  .metric-card,
+  .summary-card,
+  .stat-card,
+  .search-box,
+  .form-control:not(.invoice-print-container input):not(.invoice-print-container select),
+  .date-range-picker,
+  .filter-bar,
+  .table-actions-col,
+  .table-actions,
+  .action-icon-btn,
   .pagination-container,
+  .recharts-responsive-container,
+  .recharts-wrapper,
+  .charts-grid,
   .modal-overlay,
   .modal-backdrop,
-  .toast-container {
+  .toast-container,
+  .drawer-overlay,
+  .drawer-container {
     display: none !important;
   }
 
-  .app-container {
-    display: block !important;
-    height: auto !important;
-    width: 100% !important;
-    overflow: visible !important;
-  }
-
+  /* Full Width Printable Containers */
+  .app-container,
   .main-content,
-  .content-area {
+  .content-area,
+  .page-content,
+  .page-container {
+    display: block !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
-    background: transparent !important;
+    max-width: 100% !important;
     overflow: visible !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
+  .erp-card {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  /* Hide cards that only contain filters or summary charts without table */
+  .erp-card:not(:has(.erp-table)):not(:has(.table-wrapper)):not(:has(.invoice-print-container)):not(:has(table)) {
+    display: none !important;
+  }
+
+  .table-wrapper,
+  .table-responsive {
+    overflow: visible !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Clean Table-Only Styles */
+  .erp-table,
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    font-size: 10.5px !important;
+    background-color: #ffffff !important;
+  }
+
+  .erp-table tr,
+  table tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  .erp-table thead,
+  table thead {
+    display: table-header-group !important;
+  }
+
+  .erp-table th,
+  table th {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    font-weight: 700 !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 6px 8px !important;
+    text-align: left !important;
+    font-size: 10.5px !important;
+  }
+
+  .erp-table td,
+  table td {
+    border: 1px solid #e2e8f0 !important;
+    color: #1e293b !important;
+    padding: 5px 8px !important;
+    font-size: 10px !important;
+  }
+
+  /* Allow Tax Invoice View to Print Intact */
   .invoice-print-container {
+    display: block !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
   }
-
-  .erp-card {
-    box-shadow: none !important;
-    border: 1px solid #cbd5e1 !important;
-  }
-
-  .erp-table th,
-  .erp-table td {
-    border-color: #cbd5e1 !important;
-    color: #000000 !important;
-  }
 }
+
 
 

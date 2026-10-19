@@ -565,6 +565,327 @@ export const storageService = {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     }
+  },
+
+  // Alias for backward compatibility
+  exportToExcel(filename, rows, columns = null) {
+    return this.exportToCSV(filename, rows, columns);
+  },
+
+  // Isolated Table-Only PDF / Print Generator (guarantees ONLY table data is printed)
+  exportToPDF(filename, rows, columns = null, options = {}) {
+    if (!rows || !rows.length) {
+      alert('No data records available to export.');
+      return;
+    }
+
+    const titleMap = {
+      id: 'S.No',
+      sno: 'S.No',
+      date: 'Date',
+      supplier: 'Supplier / Party Name',
+      threadType: 'Thread Type',
+      color: 'Color',
+      boxBag: 'Box / Bag',
+      qty: 'Quantity (Kg)',
+      rate: 'Rate (₹)',
+      subtotal: 'Subtotal (₹)',
+      total: 'Total Amount (₹)',
+      gstMode: 'GST Mode',
+      gstRate: 'GST %',
+      gstAmount: 'GST (₹)',
+      final: 'Net Total (₹)',
+      billNumber: 'Bill / Invoice No',
+      invoiceNo: 'Invoice No',
+      billDate: 'Bill Date',
+      paymentDate: 'Payment Date',
+      payDate: 'Payment Date',
+      dueDate: 'Due Date',
+      paidAmount: 'Paid Amount (₹)',
+      balanceAmount: 'Balance Due (₹)',
+      status: 'Status',
+      notes: 'Notes',
+      customerId: 'Customer ID',
+      customerName: 'Customer Name',
+      customerType: 'Customer Type',
+      companyName: 'Company Name',
+      phone: 'Phone',
+      gstin: 'GSTIN',
+      city: 'City',
+      machine: 'Machine Name / ID',
+      cost: 'Cost (₹)',
+      units: 'Units Consumed',
+      prev: 'Previous Reading',
+      curr: 'Current Reading',
+      fixed: 'Fixed Charges (₹)',
+      additional: 'Additional Charges (₹)',
+      empId: 'Emp ID',
+      name: 'Employee Name',
+      type: 'Work Type',
+      daysWorked: 'Days Worked',
+      totalEarned: 'Total Earned (₹)',
+      gross: 'Gross Earnings (₹)',
+      net: 'Net Salary (₹)',
+      salary: 'Salary (₹)',
+      amount: 'Amount (₹)'
+    };
+
+    const excludedKeys = new Set(['_id', '__v', 'gstMode', 'password', 'actions', 'action']);
+
+    let headers = [];
+    let fieldExtractors = [];
+    let alignments = [];
+
+    if (columns && Array.isArray(columns) && columns.length > 0) {
+      const validCols = columns.filter(c => {
+        const k = String(c.key || '').toLowerCase();
+        const h = String(c.header || '').toLowerCase();
+        return k !== 'actions' && k !== 'action' && h !== 'actions' && h !== 'action' && h !== 'action controls';
+      });
+
+      headers = validCols.map(c => c.header || titleMap[c.key] || c.key);
+      alignments = validCols.map(c => c.align || (c.key === 'id' || c.key === 'sno' ? 'center' : 'left'));
+
+      fieldExtractors = validCols.map(c => {
+        return (row, idx) => {
+          if (c.pdfValue && typeof c.pdfValue === 'function') {
+            return c.pdfValue(row, idx);
+          }
+          if (c.key === 'id' || c.key === 'sno' || c.header === 'S. No' || c.header === 'S.No' || c.header === 'S.No.') {
+            return row.sno !== undefined && row.sno !== null ? row.sno : idx + 1;
+          }
+          if (c.key === 'dueDate') {
+            return formatDate(getItemDueDate(row));
+          }
+          if (c.key === 'status') {
+            return isOverdue(row) ? 'Overdue' : (row.status || getPaymentStatus(row));
+          }
+          if (c.key === 'paidAmount') {
+            const total = Number(row.total || row.final || row.grandTotal || 0);
+            return row.paidAmount !== undefined && row.paidAmount !== null && row.paidAmount !== ''
+              ? Number(row.paidAmount).toLocaleString('en-IN')
+              : (getPaymentStatus(row) === 'Paid' ? total.toLocaleString('en-IN') : '0');
+          }
+          if (c.key === 'balanceAmount') {
+            const total = Number(row.total || row.final || row.grandTotal || 0);
+            const paid = row.paidAmount !== undefined && row.paidAmount !== null && row.paidAmount !== ''
+              ? Number(row.paidAmount)
+              : (getPaymentStatus(row) === 'Paid' ? total : 0);
+            return Math.max(0, total - paid).toLocaleString('en-IN');
+          }
+
+          // Support nested fields (e.g., billingAddress.city)
+          let val = row[c.key];
+          if (val === undefined && c.key && c.key.includes('.')) {
+            val = c.key.split('.').reduce((obj, key) => obj?.[key], row);
+          }
+          if (c.key === 'city' && !val && row.billingAddress?.city) {
+            val = row.billingAddress.city;
+          }
+
+          if (val === null || val === undefined) return '-';
+          if (c.key === 'date' || c.key.toLowerCase().includes('date') || c.key === 'joinDate' || c.key === 'billDate' || c.key === 'payDate') {
+            return formatDate(val);
+          }
+          if (typeof val === 'number') {
+            return Number.isInteger(val) ? val.toLocaleString('en-IN') : val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          }
+          return String(val);
+        };
+      });
+    } else {
+      const allKeys = Object.keys(rows[0]).filter(k => !excludedKeys.has(k));
+      headers = allKeys.map(k => titleMap[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()));
+      alignments = allKeys.map(() => 'left');
+      fieldExtractors = allKeys.map(k => {
+        return (row, idx) => {
+          if (k === 'id' || k === 'sno') return row.sno !== undefined && row.sno !== null ? row.sno : idx + 1;
+          if (k === 'dueDate') return formatDate(getItemDueDate(row));
+          if (k === 'status') return isOverdue(row) ? 'Overdue' : getPaymentStatus(row);
+          const val = row[k];
+          if (val === null || val === undefined) return '-';
+          if (k === 'date' || k.toLowerCase().includes('date') || k === 'joinDate' || k === 'billDate') {
+            return formatDate(val);
+          }
+          if (k === 'createdAt' || k === 'updatedAt') {
+            return formatDateTime(val);
+          }
+          if (typeof val === 'number') return val.toLocaleString('en-IN');
+          return String(val);
+        };
+      });
+    }
+
+    const escapeHtml = (str) => {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    };
+
+    const cleanTitle = (filename || 'Report').replace(/_/g, ' ');
+    const nowStr = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    let rowsHtml = '';
+    rows.forEach((row, idx) => {
+      rowsHtml += '<tr>';
+      fieldExtractors.forEach((extractor, cIdx) => {
+        const val = extractor(row, idx);
+        const align = alignments[cIdx] || 'left';
+        rowsHtml += `<td style="text-align: ${align};">${escapeHtml(val)}</td>`;
+      });
+      rowsHtml += '</tr>';
+    });
+
+    let theadHtml = '<tr>';
+    headers.forEach((h, cIdx) => {
+      const align = alignments[cIdx] || 'left';
+      theadHtml += `<th style="text-align: ${align};">${escapeHtml(h)}</th>`;
+    });
+    theadHtml += '</tr>';
+
+    const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(cleanTitle)}</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 8mm 6mm;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 11px;
+      line-height: 1.35;
+      color: #0f172a;
+      background: #ffffff;
+      padding: 10px;
+    }
+    .header-bar {
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #0f172a;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .header-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+    .header-sub {
+      font-size: 12px;
+      font-weight: 600;
+      color: #2563eb;
+      margin-top: 2px;
+    }
+    .header-meta {
+      font-size: 10px;
+      color: #64748b;
+      text-align: right;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: auto;
+      page-break-inside: auto;
+      font-size: 10px;
+    }
+    tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+    thead {
+      display: table-header-group;
+    }
+    th {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      border: 1px solid #cbd5e1;
+      padding: 6px 8px;
+      white-space: nowrap;
+    }
+    td {
+      border: 1px solid #e2e8f0;
+      padding: 5px 8px;
+      color: #1e293b;
+    }
+    tbody tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+    @media print {
+      body {
+        padding: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header-bar">
+    <div>
+      <div class="header-title">NSS-TEX TOWELS & TEXTILES</div>
+      <div class="header-sub">${escapeHtml(cleanTitle)}</div>
+    </div>
+    <div class="header-meta">
+      <div>Date: ${escapeHtml(nowStr)}</div>
+      <div>Total Records: ${rows.length}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      ${theadHtml}
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+</body>
+</html>`;
+
+    const printFrame = document.createElement('iframe');
+    printFrame.name = 'pdf_print_frame_' + Date.now();
+    printFrame.style.position = 'fixed';
+    printFrame.style.top = '-9999px';
+    printFrame.style.left = '-9999px';
+    printFrame.style.width = '1200px';
+    printFrame.style.height = '800px';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const doc = printFrame.contentDocument || printFrame.contentWindow.document;
+    doc.open();
+    doc.write(fullHtml);
+    doc.close();
+
+    setTimeout(() => {
+      try {
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+      } catch (err) {
+        console.error('PDF print execution failed, fallback to window.print', err);
+        window.print();
+      } finally {
+        setTimeout(() => {
+          if (printFrame.parentNode) {
+            printFrame.parentNode.removeChild(printFrame);
+          }
+        }, 2000);
+      }
+    }, 250);
   }
 };
 

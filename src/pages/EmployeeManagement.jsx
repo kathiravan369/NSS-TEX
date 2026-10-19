@@ -24,6 +24,7 @@ import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { storageService } from '../services/storageService';
 import { formatINR, formatDate, formatDateTime } from '../utils/formatters';
 import EmployeeSalarySidePanel from '../components/employee/EmployeeSalarySidePanel';
@@ -76,6 +77,8 @@ export default function EmployeeManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [workTypeFilter, setWorkTypeFilter] = useState('All Work Types');
   const [statusFilter, setStatusFilter] = useState('All Status');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -137,9 +140,18 @@ export default function EmployeeManagement() {
       const matchesStatus =
         statusFilter === 'All Status' || item.status === statusFilter;
 
-      return matchesSearch && matchesType && matchesStatus;
+      let matchesDate = true;
+      const empDate = (item.joinDate ? item.joinDate.split('T')[0] : '') || (item.createdAt ? item.createdAt.split('T')[0] : '');
+      if (startDate) {
+        matchesDate = matchesDate && empDate >= startDate;
+      }
+      if (endDate) {
+        matchesDate = matchesDate && empDate <= endDate;
+      }
+
+      return matchesSearch && matchesType && matchesStatus && matchesDate;
     });
-  }, [items, searchQuery, workTypeFilter, statusFilter]);
+  }, [items, searchQuery, workTypeFilter, statusFilter, startDate, endDate]);
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const paginatedItems = filteredItems.slice((page - 1) * itemsPerPage, page * itemsPerPage);
@@ -435,6 +447,10 @@ export default function EmployeeManagement() {
     showToast('Exported Excel file successfully.');
   };
 
+  const handleExportPDF = () => {
+    storageService.exportToPDF('Employee_Directory', filteredItems, columns);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <Toast toast={toast} onClose={() => setToast(null)} />
@@ -509,9 +525,29 @@ export default function EmployeeManagement() {
       {/* Directory Table */}
       <div className="erp-card">
         <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div className="card-title-group">
+          <div className="card-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <FileText size={18} color="var(--primary-600)" />
             <h3 className="card-title">Employee Directory</h3>
+            {startDate && (
+              <span
+                onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
+                style={{
+                  fontSize: '0.725rem',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '9999px',
+                  backgroundColor: '#ccfbf1',
+                  color: '#0f766e',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}
+                title="Click to clear date filter"
+              >
+                Date: {startDate}{endDate ? ` to ${endDate}` : ''} ✕
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
@@ -569,10 +605,25 @@ export default function EmployeeManagement() {
               <option value="Inactive">Inactive</option>
             </select>
 
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setPage(1);
+              }}
+              onReset={() => {
+                setStartDate('');
+                setEndDate('');
+                setPage(1);
+              }}
+            />
+
             <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportCSV}>
               <Download size={14} /> Export Excel
             </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportPDF}>
               <Printer size={14} /> Export PDF
             </button>
           </div>

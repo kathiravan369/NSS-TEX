@@ -26,6 +26,7 @@ import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { storageService } from '../services/storageService';
 import { api } from '../services/api';
 import { formatINR, formatDate } from '../utils/formatters';
@@ -82,6 +83,8 @@ export default function CustomerDetails() {
   const [searchQuery, setSearchQuery] = useState('');
   const [customerTypeFilter, setCustomerTypeFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [nextSuggestedId, setNextSuggestedId] = useState('CUS-001');
@@ -145,9 +148,18 @@ export default function CustomerDetails() {
         statusFilter === 'All' ||
         cust.status === statusFilter;
 
-      return matchesSearch && matchesType && matchesStatus;
+      let matchesDate = true;
+      const custDate = (cust.createdAt ? cust.createdAt.split('T')[0] : '') || (cust.created_at ? cust.created_at.split('T')[0] : '');
+      if (startDate) {
+        matchesDate = matchesDate && custDate >= startDate;
+      }
+      if (endDate) {
+        matchesDate = matchesDate && custDate <= endDate;
+      }
+
+      return matchesSearch && matchesType && matchesStatus && matchesDate;
     });
-  }, [customers, searchQuery, customerTypeFilter, statusFilter]);
+  }, [customers, searchQuery, customerTypeFilter, statusFilter, startDate, endDate]);
 
   const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage) || 1;
   const paginatedCustomers = filteredCustomers.slice(
@@ -159,6 +171,8 @@ export default function CustomerDetails() {
     setSearchQuery('');
     setCustomerTypeFilter('All');
     setStatusFilter('All');
+    setStartDate('');
+    setEndDate('');
     setPage(1);
   };
 
@@ -343,6 +357,10 @@ export default function CustomerDetails() {
     showToast('Exported Customer directory to Excel.');
   };
 
+  const handleExportPDF = () => {
+    storageService.exportToPDF('Customer_Directory', filteredCustomers, columns);
+  };
+
   const columns = [
     {
       key: 'id',
@@ -453,7 +471,7 @@ export default function CustomerDetails() {
           <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportCSV}>
             <Download size={14} /> Export Excel
           </button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportPDF}>
             <Printer size={14} /> Export PDF
           </button>
           <button type="button" className="btn btn-primary btn-sm" onClick={handleOpenAddModal}>
@@ -506,6 +524,21 @@ export default function CustomerDetails() {
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
             </select>
+
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setPage(1);
+              }}
+              onReset={() => {
+                setStartDate('');
+                setEndDate('');
+                setPage(1);
+              }}
+            />
 
             <button
               type="button"

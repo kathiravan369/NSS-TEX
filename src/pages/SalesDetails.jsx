@@ -28,6 +28,7 @@ import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
+import DateRangePicker from '../components/common/DateRangePicker';
 import { storageService } from '../services/storageService';
 import { api } from '../services/api';
 import { formatINR, formatDate } from '../utils/formatters';
@@ -220,6 +221,20 @@ export default function SalesDetails() {
     showToast('Exported report to Excel.');
   };
 
+  const handleExportPDF = () => {
+    if (activeTab === 'transactions') {
+      storageService.exportToPDF('Sales_Transactions', filteredInvoices, transactionColumns);
+    } else if (activeTab === 'customer') {
+      storageService.exportToPDF('Customer_Wise_Sales', customerWiseData);
+    } else if (activeTab === 'product') {
+      storageService.exportToPDF('Product_Wise_Sales', productWiseData);
+    } else if (activeTab === 'outstanding') {
+      storageService.exportToPDF('Outstanding_Payments_Report', outstandingData);
+    } else {
+      storageService.exportToPDF('Sales_Report', filteredInvoices, transactionColumns);
+    }
+  };
+
   // Transactions table columns matching panel 3
   const transactionColumns = [
     {
@@ -354,7 +369,7 @@ export default function SalesDetails() {
           <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportExcel}>
             <Download size={14} /> Export Excel
           </button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportPDF}>
             <Printer size={14} /> Export PDF
           </button>
           <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/sales/invoices/new')}>
@@ -413,32 +428,20 @@ export default function SalesDetails() {
       {/* Filter Toolbar matching Panel 3 */}
       <div className="erp-card" style={{ padding: '0.85rem 1.15rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          {/* Date range inputs */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <input
-              type="date"
-              className="form-control"
-              style={{ width: '135px', height: '36px', fontSize: '0.78rem' }}
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setPage(1);
-              }}
-              title="Start Date"
-            />
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>
-            <input
-              type="date"
-              className="form-control"
-              style={{ width: '135px', height: '36px', fontSize: '0.78rem' }}
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setPage(1);
-              }}
-              title="End Date"
-            />
-          </div>
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onChange={({ startDate: s, endDate: e }) => {
+              setStartDate(s);
+              setEndDate(e);
+              setPage(1);
+            }}
+            onReset={() => {
+              setStartDate('');
+              setEndDate('');
+              setPage(1);
+            }}
+          />
 
           {/* Customer Dropdown */}
           <select
