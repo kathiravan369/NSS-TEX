@@ -51,7 +51,7 @@ export default function SalesDetails() {
   const [salespersonFilter, setSalespersonFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Periodic report granularity
   const [periodGranularity, setPeriodGranularity] = useState('monthly'); // 'daily', 'weekly', 'monthly'

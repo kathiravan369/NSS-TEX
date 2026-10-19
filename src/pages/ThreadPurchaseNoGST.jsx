@@ -68,7 +68,7 @@ export default function ThreadPurchaseNoGST() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
-  const itemsPerPage = 6;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Sorting State for S.No, Due Date, and Amount
   const [sortField, setSortField] = useState('sno');
@@ -1058,6 +1058,10 @@ export default function ThreadPurchaseNoGST() {
           totalItems={sortedItems.length}
           itemsPerPage={itemsPerPage}
           onPageChange={(newPage) => setPage(newPage)}
+          onItemsPerPageChange={(newSize) => {
+            setItemsPerPage(newSize);
+            setPage(1);
+          }}
           sortField={sortField}
           sortOrder={sortOrder}
           onSort={handleSort}

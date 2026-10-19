@@ -27,7 +27,7 @@ export default function DataTable({
   page = 1,
   totalPages = 1,
   totalItems = 0,
-  itemsPerPage = 20,
+  itemsPerPage = 10,
   onPageChange,
   onItemsPerPageChange,
   sortField,
@@ -36,13 +36,20 @@ export default function DataTable({
 }) {
   const [pageSizeOpen, setPageSizeOpen] = useState(false);
   const pageSizeRef = useRef(null);
-  const [internalPageSize, setInternalPageSize] = useState(itemsPerPage || 20);
+  const [internalPageSize, setInternalPageSize] = useState(itemsPerPage || 10);
+  const [internalPage, setInternalPage] = useState(page || 1);
 
   useEffect(() => {
     if (itemsPerPage) {
       setInternalPageSize(itemsPerPage);
     }
   }, [itemsPerPage]);
+
+  useEffect(() => {
+    if (page) {
+      setInternalPage(page);
+    }
+  }, [page]);
 
   // Click outside listener for upward items per page menu
   useEffect(() => {
@@ -55,21 +62,31 @@ export default function DataTable({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const isControlled = Boolean(onPageChange);
+  const effectiveItemsPerPage = itemsPerPage || internalPageSize || 10;
+  const effectiveTotalItems = totalItems !== undefined && totalItems !== null ? totalItems : data.length;
+  const computedTotalPages = totalPages || Math.ceil(effectiveTotalItems / effectiveItemsPerPage) || 1;
+  const currentPage = isControlled ? (page || 1) : internalPage;
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || (computedTotalPages > 0 && newPage > computedTotalPages)) return;
+    if (onPageChange) {
+      onPageChange(newPage);
+    } else {
+      setInternalPage(newPage);
+    }
+  };
+
   const handlePageSizeSelect = (size) => {
     setInternalPageSize(size);
     setPageSizeOpen(false);
     if (onItemsPerPageChange) {
       onItemsPerPageChange(size);
     }
-    if (onPageChange) {
-      onPageChange(1);
-    }
+    handlePageChange(1);
   };
 
-  const effectiveItemsPerPage = itemsPerPage || internalPageSize || 20;
-  const effectiveTotalItems = totalItems !== undefined && totalItems !== null ? totalItems : data.length;
-  const computedTotalPages = totalPages || Math.ceil(effectiveTotalItems / effectiveItemsPerPage) || 1;
-  const currentPage = page || 1;
+  const displayRows = isControlled ? data : data.slice((currentPage - 1) * effectiveItemsPerPage, currentPage * effectiveItemsPerPage);
 
   // Generate page numbers
   const getPageNumbers = () => {
@@ -142,7 +159,7 @@ export default function DataTable({
             </tr>
           </thead>
           <tbody>
-            {data.length === 0 ? (
+            {displayRows.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length + (onView || onEdit || onDelete ? 1 : 0)}
@@ -152,7 +169,7 @@ export default function DataTable({
                 </td>
               </tr>
             ) : (
-              data.map((row, idx) => {
+              displayRows.map((row, idx) => {
                 const locked = isPaidLocked(row);
                 const displaySno = row.sno !== undefined && row.sno !== null
                   ? row.sno
@@ -331,7 +348,7 @@ export default function DataTable({
                   boxSizing: 'border-box'
                 }}
               >
-                {[20, 50, 100].map((option) => (
+                {Array.from(new Set([10, 20, 50, 100, effectiveItemsPerPage])).sort((a, b) => a - b).map((option) => (
                   <div
                     key={option}
                     onClick={() => handlePageSizeSelect(option)}
@@ -371,7 +388,7 @@ export default function DataTable({
           <button
             type="button"
             disabled={currentPage <= 1}
-            onClick={() => onPageChange && onPageChange(currentPage - 1)}
+            onClick={() => handlePageChange(currentPage - 1)}
             style={{
               width: '36px',
               height: '36px',
@@ -397,7 +414,7 @@ export default function DataTable({
               <button
                 key={num}
                 type="button"
-                onClick={() => onPageChange && onPageChange(num)}
+                onClick={() => handlePageChange(num)}
                 style={{
                   width: '36px',
                   height: '36px',
@@ -424,7 +441,7 @@ export default function DataTable({
           <button
             type="button"
             disabled={currentPage >= computedTotalPages}
-            onClick={() => onPageChange && onPageChange(currentPage + 1)}
+            onClick={() => handlePageChange(currentPage + 1)}
             style={{
               width: '36px',
               height: '36px',

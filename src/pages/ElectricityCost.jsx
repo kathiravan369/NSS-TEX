@@ -62,7 +62,7 @@ export default function ElectricityCost() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
-  const itemsPerPage = 6;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const loadData = async () => {
     try {
@@ -596,6 +596,10 @@ export default function ElectricityCost() {
           totalItems={filteredItems.length}
           itemsPerPage={itemsPerPage}
           onPageChange={(newPage) => setPage(newPage)}
+          onItemsPerPageChange={(newSize) => {
+            setItemsPerPage(newSize);
+            setPage(1);
+          }}
         />
       </div>
 

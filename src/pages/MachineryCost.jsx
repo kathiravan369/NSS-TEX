@@ -75,7 +75,7 @@ export default function MachineryCost() {
   const [sortField, setSortField] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
   const [page, setPage] = useState(1);
-  const itemsPerPage = 6;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -1099,6 +1099,10 @@ export default function MachineryCost() {
           totalItems={sortedItems.length}
           itemsPerPage={itemsPerPage}
           onPageChange={(newPage) => setPage(newPage)}
+          onItemsPerPageChange={(newSize) => {
+            setItemsPerPage(newSize);
+            setPage(1);
+          }}
           sortField={sortField}
           sortOrder={sortOrder}
           onSort={handleSort}

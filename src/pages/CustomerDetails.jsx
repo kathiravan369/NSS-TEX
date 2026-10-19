@@ -86,7 +86,7 @@ export default function CustomerDetails() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [nextSuggestedId, setNextSuggestedId] = useState('CUS-001');
 
   const showToast = (message, type = 'success') => {

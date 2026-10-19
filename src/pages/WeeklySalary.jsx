@@ -90,7 +90,7 @@ export default function WeeklySalary() {
   const [sortField, setSortField] = useState('sno');
   const [sortOrder, setSortOrder] = useState('asc');
   const [page, setPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Modal box state for Add / Edit
   const [isModalOpen, setIsModalOpen] = useState(false);

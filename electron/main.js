@@ -1,4 +1,4 @@
-const { app, BrowserWindow, nativeImage } = require('electron');
+const { app, BrowserWindow, nativeImage, shell, session } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 
@@ -8,11 +8,12 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('com.nsstowels.erp');
 }
 
+const BACKEND_PORT = process.env.PORT || 5001;
 let backendProcess = null;
 
 function startBackendServer() {
   const http = require('http');
-  const checkReq = http.request('http://localhost:5000/api/health', { method: 'GET', timeout: 800 }, () => {
+  const checkReq = http.request(`http://localhost:${BACKEND_PORT}/api/health`, { method: 'GET', timeout: 800 }, () => {
     // Backend is already up and running
   });
 
@@ -20,7 +21,7 @@ function startBackendServer() {
     try {
       const serverScript = path.join(__dirname, '../backend/server.js');
       backendProcess = fork(serverScript, [], {
-        env: { ...process.env, PORT: 5000 },
+        env: { ...process.env, PORT: BACKEND_PORT },
         stdio: 'ignore'
       });
 
@@ -71,6 +72,22 @@ function createWindow() {
   if (appIcon && !appIcon.isEmpty()) {
     win.setIcon(appIcon);
   }
+
+  // Security: Prevent unintended in-app navigation and open external links in default OS browser
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http:') || url.startsWith('https:')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
+  win.webContents.on('will-navigate', (event, navigationUrl) => {
+    const isDevUrl = navigationUrl.startsWith('http://localhost:5173') || navigationUrl.startsWith('http://127.0.0.1:5173');
+    if (!isDevUrl && !navigationUrl.startsWith('file://')) {
+      event.preventDefault();
+      shell.openExternal(navigationUrl);
+    }
+  });
 
   const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 

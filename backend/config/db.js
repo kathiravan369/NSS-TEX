@@ -30,9 +30,9 @@ function getPoolConfig() {
 
   return {
     host: process.env.PGHOST || 'localhost',
-    port: Number(process.env.PGPORT || 5000),
+    port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
     user: process.env.PGUSER || 'postgres',
-    password: process.env.PGPASSWORD || 'Skathir@123',
+    password: process.env.PGPASSWORD || '',
     database: process.env.PGDATABASE || 'nss_towels',
     max: 20,
     idleTimeoutMillis: 30000,
