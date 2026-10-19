@@ -522,7 +522,7 @@ export default function InvoiceList() {
           isOpen={!!paymentModalInvoice}
           onClose={() => setPaymentModalInvoice(null)}
           title={`Record Payment — ${paymentModalInvoice.invoiceNo}`}
-          maxWidth="620px"
+          maxWidth="1120px"
         >
           <form onSubmit={handleRecordPayment} style={{ width: '100%' }}>
             <div style={{ backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '6px', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>

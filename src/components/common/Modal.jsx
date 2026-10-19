@@ -4,19 +4,19 @@ import { X } from 'lucide-react';
 const SIZES = {
   sm: '560px',
   md: '760px',
-  lg: '940px',
+  lg: '1120px',
   xl: '1120px',
   full: '96vw'
 };
 
-export default function Modal({ isOpen, onClose, title, children, maxWidth = '880px', size }) {
+export default function Modal({ isOpen, onClose, title, children, maxWidth = '1120px', size }) {
   if (!isOpen) return null;
 
-  // Resolve modal max-width based on size preset or custom maxWidth
-  let resolvedMaxWidth = '880px';
+  // Resolve modal max-width (defaults to 1120px for all modals)
+  let resolvedMaxWidth = '1120px';
   if (size && SIZES[size]) {
     resolvedMaxWidth = SIZES[size];
-  } else if (maxWidth && maxWidth !== '600px') {
+  } else if (maxWidth && maxWidth !== '600px' && maxWidth !== '880px') {
     resolvedMaxWidth = maxWidth;
   }
 

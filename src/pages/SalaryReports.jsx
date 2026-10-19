@@ -502,7 +502,7 @@ export default function SalaryReports() {
           isOpen={Boolean(viewingItem)}
           onClose={() => setViewingItem(null)}
           title={`Monthly Reconciled Payslip: ${viewingItem.name} (${viewingItem.empId})`}
-          size="md"
+          maxWidth="1120px"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div

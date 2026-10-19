@@ -1120,7 +1120,7 @@ export default function CreateInvoice() {
         isOpen={isQuickCustomerOpen}
         onClose={() => setIsQuickCustomerOpen(false)}
         title="Quick Add Customer"
-        maxWidth="640px"
+        maxWidth="1120px"
       >
         <form onSubmit={handleQuickCustomerSubmit} style={{ width: '100%' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

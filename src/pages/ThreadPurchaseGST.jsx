@@ -631,7 +631,7 @@ export default function ThreadPurchaseGST() {
           setEditingId(null);
         }}
         title={editingId ? 'Edit Thread Purchase (With GST)' : 'Add Thread Purchase (With GST)'}
-        maxWidth="940px"
+        maxWidth="1120px"
       >
         <form onSubmit={handleSubmit} style={{ width: '100%', boxSizing: 'border-box' }}>
           <div className="erp-form-grid">
@@ -1109,7 +1109,7 @@ export default function ThreadPurchaseGST() {
       </div>
 
       {/* View Details Modal */}
-      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Thread Purchase Details" maxWidth="780px">
+      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Thread Purchase Details" maxWidth="1120px">
         {viewingItem && (() => {
           const vTotal = Number(viewingItem.total || 0);
           const vPaid = viewingItem.paidAmount !== undefined && viewingItem.paidAmount !== null && viewingItem.paidAmount !== ''

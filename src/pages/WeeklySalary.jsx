@@ -918,7 +918,7 @@ export default function WeeklySalary() {
           setEditingId(null);
         }}
         title={editingId ? 'Edit Weekly Salary Record' : 'Add Weekly Salary Calculation'}
-        maxWidth="1080px"
+        maxWidth="1120px"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
           {/* Top Control Bar */}
@@ -1752,7 +1752,7 @@ export default function WeeklySalary() {
       </Modal>
 
       {/* View Details Modal with Complete Size-Wise & Count Breakdown */}
-      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Weekly Work Record Details" maxWidth="780px">
+      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Weekly Work Record Details" maxWidth="1120px">
         {viewingItem && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
