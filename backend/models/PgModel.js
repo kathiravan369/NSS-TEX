@@ -341,6 +341,10 @@ class PgModel {
     const cleanUpdate = { ...(update.$set || update) };
     delete cleanUpdate._id;
     delete cleanUpdate.id;
+    delete cleanUpdate.updatedAt;
+    delete cleanUpdate.updated_at;
+    delete cleanUpdate.createdAt;
+    delete cleanUpdate.created_at;
 
     const setClauses = [];
     const params = [];
@@ -362,7 +366,10 @@ class PgModel {
       return this.findById(id);
     }
 
-    setClauses.push(`"updated_at" = NOW()`);
+    if (!seenCols.has('updated_at') && (this.fields.updatedAt || this.fields.updated_at)) {
+      setClauses.push(`"updated_at" = NOW()`);
+      seenCols.add('updated_at');
+    }
     let targetPk = id;
     if (typeof id === 'number' || (typeof id === 'string' && /^\d+$/.test(id))) {
       targetPk = parseInt(id, 10);
