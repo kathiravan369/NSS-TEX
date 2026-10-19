@@ -147,16 +147,72 @@ exports.updateMachineryExpense = async (req, res, next) => {
     const { id } = req.params;
     const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (isDbConnected && isValidObjectId(id)) {
-      const expense = await MachineryExpense.findByIdAndUpdate(id, req.body, { new: true, runValidators: true });
+    if (isDbConnected) {
+      let expense = await MachineryExpense.findById(id);
+      if (!expense) {
+        expense = await MachineryExpense.findOne({ machineId: id });
+      }
       if (!expense) return res.status(404).json({ success: false, error: 'Machinery expense record not found' });
-      return res.json({ success: true, data: expense });
+
+      const cost = req.body.cost !== undefined ? Number(req.body.cost) : Number(expense.cost || 0);
+      const isGst = req.body.includeGST !== undefined ? Boolean(req.body.includeGST) : Boolean(expense.includeGST);
+      const gstRate = req.body.gstRate !== undefined ? Number(req.body.gstRate) : (isGst ? Number(expense.gstRate || 18) : 0);
+      const gst = req.body.gst !== undefined ? Number(req.body.gst) : (isGst ? (cost * gstRate) / 100 : 0);
+      const total = req.body.total !== undefined ? Number(req.body.total) : (cost + gst);
+      const paidAmount = req.body.paidAmount !== undefined && req.body.paidAmount !== null && req.body.paidAmount !== ''
+        ? Number(req.body.paidAmount)
+        : Number(expense.paidAmount || 0);
+      const balanceAmount = req.body.balanceAmount !== undefined && req.body.balanceAmount !== null && req.body.balanceAmount !== ''
+        ? Number(req.body.balanceAmount)
+        : Math.max(0, total - paidAmount);
+      const effectiveStatus = total > 0 && balanceAmount === 0 ? 'Paid' : (req.body.status || expense.status || 'Pending');
+
+      const updated = await MachineryExpense.findByIdAndUpdate(expense.id, {
+        ...req.body,
+        cost,
+        includeGST: isGst,
+        gstRate,
+        gst,
+        total,
+        paidAmount,
+        balanceAmount,
+        status: effectiveStatus,
+        paidAt: req.body.paidAt || (effectiveStatus === 'Paid' ? (expense.paidAt || new Date()) : null)
+      }, { new: true, runValidators: true });
+
+      return res.json({ success: true, data: updated });
     }
 
-    const idx = runtimeStore.machineryExpenses.findIndex(m => m._id === id || m.id === id);
+    const idx = runtimeStore.machineryExpenses.findIndex(m => m._id === id || m.id === id || m.machineId === id);
     if (idx === -1) return res.status(404).json({ success: false, error: 'Machinery expense record not found' });
 
-    runtimeStore.machineryExpenses[idx] = { ...runtimeStore.machineryExpenses[idx], ...req.body };
+    const existing = runtimeStore.machineryExpenses[idx];
+    const cost = req.body.cost !== undefined ? Number(req.body.cost) : Number(existing.cost || 0);
+    const isGst = req.body.includeGST !== undefined ? Boolean(req.body.includeGST) : Boolean(existing.includeGST);
+    const gstRate = req.body.gstRate !== undefined ? Number(req.body.gstRate) : (isGst ? Number(existing.gstRate || 18) : 0);
+    const gst = req.body.gst !== undefined ? Number(req.body.gst) : (isGst ? (cost * gstRate) / 100 : 0);
+    const total = req.body.total !== undefined ? Number(req.body.total) : (cost + gst);
+    const paidAmount = req.body.paidAmount !== undefined && req.body.paidAmount !== null && req.body.paidAmount !== ''
+      ? Number(req.body.paidAmount)
+      : Number(existing.paidAmount || 0);
+    const balanceAmount = req.body.balanceAmount !== undefined && req.body.balanceAmount !== null && req.body.balanceAmount !== ''
+      ? Number(req.body.balanceAmount)
+      : Math.max(0, total - paidAmount);
+    const effectiveStatus = total > 0 && balanceAmount === 0 ? 'Paid' : (req.body.status || existing.status || 'Pending');
+
+    runtimeStore.machineryExpenses[idx] = {
+      ...existing,
+      ...req.body,
+      cost,
+      includeGST: isGst,
+      gstRate,
+      gst,
+      total,
+      paidAmount,
+      balanceAmount,
+      status: effectiveStatus,
+      paidAt: req.body.paidAt || (effectiveStatus === 'Paid' ? (existing.paidAt || new Date().toISOString()) : null)
+    };
     res.json({ success: true, data: runtimeStore.machineryExpenses[idx] });
   } catch (error) {
     next(error);
@@ -171,13 +227,19 @@ exports.deleteMachineryExpense = async (req, res, next) => {
     const { id } = req.params;
     const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (isDbConnected && isValidObjectId(id)) {
-      const expense = await MachineryExpense.findByIdAndDelete(id);
-      if (!expense) return res.status(404).json({ success: false, error: 'Machinery expense record not found' });
-      return res.json({ success: true, message: 'Machinery expense deleted' });
+    if (isDbConnected) {
+      let expense = await MachineryExpense.findById(id);
+      if (!expense) {
+        expense = await MachineryExpense.findOne({ machineId: id });
+      }
+      if (expense) {
+        await MachineryExpense.findByIdAndDelete(expense.id);
+        return res.json({ success: true, message: 'Machinery expense deleted' });
+      }
+      return res.status(404).json({ success: false, error: 'Machinery expense record not found' });
     }
 
-    const idx = runtimeStore.machineryExpenses.findIndex(m => m._id === id || m.id === id);
+    const idx = runtimeStore.machineryExpenses.findIndex(m => m._id === id || m.id === id || m.machineId === id);
     if (idx === -1) return res.status(404).json({ success: false, error: 'Machinery expense record not found' });
 
     runtimeStore.machineryExpenses.splice(idx, 1);

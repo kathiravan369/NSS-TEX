@@ -277,17 +277,58 @@ exports.updateWeeklyPayroll = async (req, res, next) => {
     const { id } = req.params;
     const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (isDbConnected && isValidObjectId(id)) {
-      const record = await WeeklyPayroll.findById(id);
+    if (isDbConnected) {
+      let record = null;
+      if (isValidObjectId(id)) {
+        record = await WeeklyPayroll.findById(id);
+      }
+      if (!record) {
+        record = await WeeklyPayroll.findOne({ id });
+      }
       if (!record) return res.status(404).json({ success: false, error: 'Payroll record not found' });
 
       if (record.isFinalized) {
         return res.status(400).json({ success: false, error: 'Cannot modify finalized payroll record' });
       }
 
-      Object.assign(record, req.body);
-      await record.save();
-      return res.json({ success: true, data: record });
+      const merged = { ...record, ...req.body };
+      const isSize = merged.workType === 'Size Based Salary' || merged.workType === 'SIZE_SALARY';
+      const isDay = merged.workType === 'Day Salary' || merged.workType === 'DAY_SALARY';
+      let grossPay = req.body.grossPay !== undefined ? Number(req.body.grossPay) : undefined;
+      let productsProduced = req.body.productsProduced !== undefined ? Number(req.body.productsProduced) : undefined;
+
+      if (grossPay === undefined) {
+        if (isSize) {
+          const lQty = Math.max(0, Number(merged.largeQuantity || 0));
+          const mQty = Math.max(0, Number(merged.mediumQuantity || 0));
+          const sQty = Math.max(0, Number(merged.smallQuantity || 0));
+          const lPrice = Number(merged.largePrice !== undefined ? merged.largePrice : 5);
+          const mPrice = Number(merged.mediumPrice !== undefined ? merged.mediumPrice : 4);
+          const sPrice = Number(merged.smallPrice !== undefined ? merged.smallPrice : 3);
+          grossPay = (lQty * lPrice) + (mQty * mPrice) + (sQty * sPrice);
+          productsProduced = lQty + mQty + sQty;
+        } else if (isDay) {
+          grossPay = (Number(merged.daysWorked) || 0) * (Number(merged.rate) || 0);
+        } else {
+          const pPrice = Number(merged.pricePerItem !== undefined ? merged.pricePerItem : merged.rate) || 0;
+          const pQty = Math.max(0, Number(merged.countQuantity !== undefined ? merged.countQuantity : merged.productsProduced) || 0);
+          grossPay = pQty * pPrice;
+          productsProduced = pQty;
+        }
+      }
+
+      const netPay = req.body.netPay !== undefined
+        ? Number(req.body.netPay)
+        : ((grossPay !== undefined ? grossPay : Number(merged.grossPay || 0)) - (Number(merged.deductions) || 0) + (Number(merged.adjustments) || 0));
+
+      const updated = await WeeklyPayroll.findByIdAndUpdate(record.id, {
+        ...req.body,
+        ...(grossPay !== undefined && { grossPay }),
+        ...(productsProduced !== undefined && { productsProduced }),
+        netPay
+      }, { new: true });
+
+      return res.json({ success: true, data: updated });
     }
 
     const idx = runtimeStore.weeklyPayroll.findIndex(r => r._id === id || r.id === id);

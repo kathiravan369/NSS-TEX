@@ -107,7 +107,7 @@ exports.getEmployeeById = async (req, res, next) => {
     const { id } = req.params;
     const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (isDbConnected && isValidObjectId(id)) {
+    if (isDbConnected) {
       const employee = await Employee.findById(id);
       if (!employee) {
         return res.status(404).json({ success: false, error: 'Employee not found' });
@@ -211,7 +211,7 @@ exports.updateEmployee = async (req, res, next) => {
     const { id } = req.params;
     const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (isDbConnected && isValidObjectId(id)) {
+    if (isDbConnected) {
       const employee = await Employee.findByIdAndUpdate(id, req.body, {
         new: true,
         runValidators: true
@@ -248,7 +248,7 @@ exports.patchEmployeeStatus = async (req, res, next) => {
 
     const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (isDbConnected && isValidObjectId(id)) {
+    if (isDbConnected) {
       const employee = await Employee.findByIdAndUpdate(id, { status }, { new: true });
       if (!employee) {
         return res.status(404).json({ success: false, error: 'Employee not found' });

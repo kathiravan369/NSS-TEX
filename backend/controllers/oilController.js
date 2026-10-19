@@ -154,16 +154,81 @@ exports.updateOilPurchase = async (req, res, next) => {
     const { id } = req.params;
     const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (isDbConnected && isValidObjectId(id)) {
-      const purchase = await OilPurchase.findByIdAndUpdate(id, req.body, { new: true, runValidators: true });
+    if (isDbConnected) {
+      let purchase = await OilPurchase.findById(id);
+      if (!purchase) {
+        const cleanInvoice = String(id).replace(/^inv_/, '').trim();
+        purchase = await OilPurchase.findOne({ invoiceNo: cleanInvoice });
+      }
       if (!purchase) return res.status(404).json({ success: false, error: 'Oil purchase not found' });
-      return res.json({ success: true, data: purchase });
+
+      const qty = req.body.qty !== undefined ? Number(req.body.qty) : Number(purchase.qty || 0);
+      const rate = req.body.rate !== undefined ? Number(req.body.rate) : Number(purchase.rate || 0);
+      const cost = req.body.cost !== undefined ? Number(req.body.cost) : (qty * rate);
+      const isGst = req.body.includeGST !== undefined ? Boolean(req.body.includeGST) : Boolean(purchase.includeGST);
+      const gstRate = req.body.gstRate !== undefined ? Number(req.body.gstRate) : Number(purchase.gstRate || 5);
+      const gst = req.body.gst !== undefined ? Number(req.body.gst) : (isGst ? (cost * gstRate) / 100 : 0);
+      const final = req.body.final !== undefined ? Number(req.body.final) : (cost + gst);
+      const paidAmount = req.body.paidAmount !== undefined && req.body.paidAmount !== null && req.body.paidAmount !== ''
+        ? Number(req.body.paidAmount)
+        : Number(purchase.paidAmount || 0);
+      const balanceAmount = req.body.balanceAmount !== undefined && req.body.balanceAmount !== null && req.body.balanceAmount !== ''
+        ? Number(req.body.balanceAmount)
+        : Math.max(0, final - paidAmount);
+      const effectiveStatus = final > 0 && balanceAmount === 0 ? 'Paid' : (req.body.status || purchase.status || 'Pending');
+
+      const updated = await OilPurchase.findByIdAndUpdate(purchase.id, {
+        ...req.body,
+        qty,
+        rate,
+        cost,
+        includeGST: isGst,
+        gstRate,
+        gst,
+        final,
+        paidAmount,
+        balanceAmount,
+        status: effectiveStatus,
+        paidAt: req.body.paidAt || (effectiveStatus === 'Paid' ? (purchase.paidAt || new Date()) : null)
+      }, { new: true, runValidators: true });
+
+      return res.json({ success: true, data: updated });
     }
 
-    const idx = runtimeStore.oilPurchases.findIndex(o => o._id === id || o.id === id);
+    const idx = runtimeStore.oilPurchases.findIndex(o => o._id === id || o.id === id || o.invoiceNo === id || `inv_${o.invoiceNo}` === id);
     if (idx === -1) return res.status(404).json({ success: false, error: 'Oil purchase not found' });
 
-    runtimeStore.oilPurchases[idx] = { ...runtimeStore.oilPurchases[idx], ...req.body };
+    const existing = runtimeStore.oilPurchases[idx];
+    const qty = req.body.qty !== undefined ? Number(req.body.qty) : Number(existing.qty || 0);
+    const rate = req.body.rate !== undefined ? Number(req.body.rate) : Number(existing.rate || 0);
+    const cost = req.body.cost !== undefined ? Number(req.body.cost) : (qty * rate);
+    const isGst = req.body.includeGST !== undefined ? Boolean(req.body.includeGST) : Boolean(existing.includeGST);
+    const gstRate = req.body.gstRate !== undefined ? Number(req.body.gstRate) : Number(existing.gstRate || 5);
+    const gst = req.body.gst !== undefined ? Number(req.body.gst) : (isGst ? (cost * gstRate) / 100 : 0);
+    const final = req.body.final !== undefined ? Number(req.body.final) : (cost + gst);
+    const paidAmount = req.body.paidAmount !== undefined && req.body.paidAmount !== null && req.body.paidAmount !== ''
+      ? Number(req.body.paidAmount)
+      : Number(existing.paidAmount || 0);
+    const balanceAmount = req.body.balanceAmount !== undefined && req.body.balanceAmount !== null && req.body.balanceAmount !== ''
+      ? Number(req.body.balanceAmount)
+      : Math.max(0, final - paidAmount);
+    const effectiveStatus = final > 0 && balanceAmount === 0 ? 'Paid' : (req.body.status || existing.status || 'Pending');
+
+    runtimeStore.oilPurchases[idx] = {
+      ...existing,
+      ...req.body,
+      qty,
+      rate,
+      cost,
+      includeGST: isGst,
+      gstRate,
+      gst,
+      final,
+      paidAmount,
+      balanceAmount,
+      status: effectiveStatus,
+      paidAt: req.body.paidAt || (effectiveStatus === 'Paid' ? (existing.paidAt || new Date().toISOString()) : null)
+    };
     res.json({ success: true, data: runtimeStore.oilPurchases[idx] });
   } catch (error) {
     next(error);

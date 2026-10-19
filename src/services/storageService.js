@@ -236,34 +236,50 @@ export const storageService = {
 
     try {
       const syncId = merged._id || merged.id || id;
+      let res;
       switch (key) {
         case 'employees':
-          await api.employees.update(syncId, merged);
+          res = await api.employees.update(syncId, merged);
           break;
         case 'threadGST':
         case 'threadNoGST':
-          await api.threadPurchases.update(syncId, merged);
+          res = await api.threadPurchases.update(syncId, merged);
           break;
         case 'oil':
-          await api.oil.updatePurchase(syncId, merged);
+          res = await api.oil.updatePurchase(syncId, merged);
           break;
         case 'machinery':
-          await api.machinery.update(syncId, merged);
+          res = await api.machinery.update(syncId, merged);
           break;
         case 'electricity':
-          await api.electricity.update(syncId, merged);
+          res = await api.electricity.update(syncId, merged);
           break;
         case 'weeklyPayroll':
-          await api.payroll.updateWeekly(syncId, merged);
+          res = await api.payroll.updateWeekly(syncId, merged);
           break;
         case 'customers':
-          await api.sales.customers.update(syncId, merged);
+          res = await api.sales.customers.update(syncId, merged);
           break;
         case 'invoices':
-          await api.sales.invoices.update(syncId, merged);
+          res = await api.sales.invoices.update(syncId, merged);
           break;
         default:
           break;
+      }
+      if (res && res.success && res.data) {
+        const serverData = res.data;
+        merged = {
+          ...merged,
+          ...serverData,
+          id: serverData._id || serverData.id || merged.id,
+          _id: serverData._id || serverData.id || merged._id
+        };
+        const currentList = this.getCollection(key);
+        const idx = currentList.findIndex(x => String(x.id) === String(merged.id) || String(x._id) === String(merged._id));
+        if (idx !== -1) {
+          currentList[idx] = merged;
+          this.saveCollection(key, currentList);
+        }
       }
     } catch (err) {
       console.warn(`[Sync Warning] Update ${key} to backend:`, err.message);

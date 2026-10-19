@@ -76,13 +76,20 @@ exports.getThreadPurchaseById = async (req, res, next) => {
     const { id } = req.params;
     const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (isDbConnected && isValidObjectId(id)) {
-      const purchase = await ThreadPurchase.findById(id);
-      if (!purchase) return res.status(404).json({ success: false, error: 'Purchase record not found' });
-      return res.json({ success: true, data: purchase });
+    if (isDbConnected) {
+      let purchase = null;
+      if (isValidObjectId(id)) {
+        purchase = await ThreadPurchase.findById(id);
+      }
+      if (!purchase) {
+        const cleanInvoice = String(id).replace(/^inv_/, '').trim();
+        purchase = await ThreadPurchase.findOne({ invoiceNo: cleanInvoice });
+      }
+      if (purchase) return res.json({ success: true, data: purchase });
+      return res.status(404).json({ success: false, error: 'Purchase record not found' });
     }
 
-    const purchase = runtimeStore.threadPurchases.find(p => p._id === id || p.id === id);
+    const purchase = runtimeStore.threadPurchases.find(p => p._id === id || p.id === id || p.invoiceNo === id || `inv_${p.invoiceNo}` === id);
     if (!purchase) return res.status(404).json({ success: false, error: 'Purchase record not found' });
     res.json({ success: true, data: purchase });
   } catch (error) {
@@ -172,28 +179,91 @@ exports.updateThreadPurchase = async (req, res, next) => {
     const { id } = req.params;
     const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (isDbConnected && isValidObjectId(id)) {
-      const purchase = await ThreadPurchase.findById(id);
-      if (!purchase) return res.status(404).json({ success: false, error: 'Purchase record not found' });
+    if (isDbConnected) {
+      let purchase = null;
+      if (isValidObjectId(id)) {
+        purchase = await ThreadPurchase.findById(id);
+      }
+      if (!purchase) {
+        const cleanInvoice = String(id).replace(/^inv_/, '').trim();
+        purchase = await ThreadPurchase.findOne({ invoiceNo: cleanInvoice });
+      }
 
-      Object.assign(purchase, req.body);
-      if (req.body.dueDate) {
-        purchase.dueDate = new Date(req.body.dueDate);
+      if (purchase) {
+        const qty = req.body.qty !== undefined ? Number(req.body.qty) : Number(purchase.qty);
+        const rate = req.body.rate !== undefined ? Number(req.body.rate) : Number(purchase.rate);
+        const gstMode = req.body.gstMode || purchase.gstMode || 'WITH_GST';
+        const isGst = gstMode.toUpperCase().includes('WITH') && !gstMode.toUpperCase().includes('WITHOUT');
+        const gstRate = req.body.gstRate !== undefined ? Number(req.body.gstRate) : (isGst ? Number(purchase.gstRate || 5) : 0);
+        const subtotal = req.body.subtotal !== undefined ? Number(req.body.subtotal) : (qty * rate);
+        const gstAmount = req.body.gstAmount !== undefined ? Number(req.body.gstAmount) : (isGst ? (subtotal * gstRate) / 100 : 0);
+        const total = req.body.total !== undefined ? Number(req.body.total) : (subtotal + gstAmount);
+        const paidAmount = req.body.paidAmount !== undefined && req.body.paidAmount !== null && req.body.paidAmount !== ''
+          ? Number(req.body.paidAmount)
+          : Number(purchase.paidAmount || 0);
+        const balanceAmount = req.body.balanceAmount !== undefined && req.body.balanceAmount !== null && req.body.balanceAmount !== ''
+          ? Number(req.body.balanceAmount)
+          : Math.max(0, total - paidAmount);
+        const effectiveStatus = total > 0 && balanceAmount === 0 ? 'Paid' : (req.body.status || purchase.status || 'Pending');
+
+        const updateData = {
+          ...req.body,
+          qty,
+          rate,
+          gstMode: isGst ? 'WITH_GST' : 'WITHOUT_GST',
+          gstRate,
+          subtotal,
+          gstAmount,
+          total,
+          paidAmount,
+          balanceAmount,
+          status: effectiveStatus,
+          paidAt: req.body.paidAt || (effectiveStatus === 'Paid' ? (purchase.paidAt || new Date()) : null),
+          dueDate: req.body.dueDate ? new Date(req.body.dueDate) : purchase.dueDate
+        };
+
+        const updated = await ThreadPurchase.findByIdAndUpdate(purchase.id, updateData, { new: true });
+        return res.json({ success: true, data: updated });
       }
-      if (req.body.paidAmount !== undefined) {
-        purchase.paidAmount = Number(req.body.paidAmount);
-      }
-      if (req.body.balanceAmount !== undefined) {
-        purchase.balanceAmount = Number(req.body.balanceAmount);
-      }
-      await purchase.save();
-      return res.json({ success: true, data: purchase });
+
+      return res.status(404).json({ success: false, error: 'Purchase record not found' });
     }
 
-    const index = runtimeStore.threadPurchases.findIndex(p => p._id === id || p.id === id);
+    const index = runtimeStore.threadPurchases.findIndex(p => p._id === id || p.id === id || p.invoiceNo === id || `inv_${p.invoiceNo}` === id);
     if (index === -1) return res.status(404).json({ success: false, error: 'Purchase record not found' });
 
-    runtimeStore.threadPurchases[index] = { ...runtimeStore.threadPurchases[index], ...req.body };
+    const existing = runtimeStore.threadPurchases[index];
+    const qty = req.body.qty !== undefined ? Number(req.body.qty) : Number(existing.qty);
+    const rate = req.body.rate !== undefined ? Number(req.body.rate) : Number(existing.rate);
+    const gstMode = req.body.gstMode || existing.gstMode || 'WITH_GST';
+    const isGst = gstMode.toUpperCase().includes('WITH') && !gstMode.toUpperCase().includes('WITHOUT');
+    const gstRate = req.body.gstRate !== undefined ? Number(req.body.gstRate) : (isGst ? Number(existing.gstRate || 5) : 0);
+    const subtotal = req.body.subtotal !== undefined ? Number(req.body.subtotal) : (qty * rate);
+    const gstAmount = req.body.gstAmount !== undefined ? Number(req.body.gstAmount) : (isGst ? (subtotal * gstRate) / 100 : 0);
+    const total = req.body.total !== undefined ? Number(req.body.total) : (subtotal + gstAmount);
+    const paidAmount = req.body.paidAmount !== undefined && req.body.paidAmount !== null && req.body.paidAmount !== ''
+      ? Number(req.body.paidAmount)
+      : Number(existing.paidAmount || 0);
+    const balanceAmount = req.body.balanceAmount !== undefined && req.body.balanceAmount !== null && req.body.balanceAmount !== ''
+      ? Number(req.body.balanceAmount)
+      : Math.max(0, total - paidAmount);
+    const effectiveStatus = total > 0 && balanceAmount === 0 ? 'Paid' : (req.body.status || existing.status || 'Pending');
+
+    runtimeStore.threadPurchases[index] = {
+      ...existing,
+      ...req.body,
+      qty,
+      rate,
+      gstMode: isGst ? 'WITH_GST' : 'WITHOUT_GST',
+      gstRate,
+      subtotal,
+      gstAmount,
+      total,
+      paidAmount,
+      balanceAmount,
+      status: effectiveStatus,
+      paidAt: req.body.paidAt || (effectiveStatus === 'Paid' ? (existing.paidAt || new Date().toISOString()) : null)
+    };
     res.json({ success: true, data: runtimeStore.threadPurchases[index] });
   } catch (error) {
     next(error);
@@ -208,13 +278,23 @@ exports.deleteThreadPurchase = async (req, res, next) => {
     const { id } = req.params;
     const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (isDbConnected && isValidObjectId(id)) {
-      const purchase = await ThreadPurchase.findByIdAndDelete(id);
-      if (!purchase) return res.status(404).json({ success: false, error: 'Purchase record not found' });
-      return res.json({ success: true, message: 'Purchase record deleted' });
+    if (isDbConnected) {
+      let purchase = null;
+      if (isValidObjectId(id)) {
+        purchase = await ThreadPurchase.findById(id);
+      }
+      if (!purchase) {
+        const cleanInvoice = String(id).replace(/^inv_/, '').trim();
+        purchase = await ThreadPurchase.findOne({ invoiceNo: cleanInvoice });
+      }
+      if (purchase) {
+        await ThreadPurchase.findByIdAndDelete(purchase.id);
+        return res.json({ success: true, message: 'Purchase record deleted' });
+      }
+      return res.status(404).json({ success: false, error: 'Purchase record not found' });
     }
 
-    const idx = runtimeStore.threadPurchases.findIndex(p => p._id === id || p.id === id);
+    const idx = runtimeStore.threadPurchases.findIndex(p => p._id === id || p.id === id || p.invoiceNo === id || `inv_${p.invoiceNo}` === id);
     if (idx === -1) return res.status(404).json({ success: false, error: 'Purchase record not found' });
 
     runtimeStore.threadPurchases.splice(idx, 1);

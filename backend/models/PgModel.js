@@ -97,6 +97,16 @@ class PgModel {
     if (doc.description && !doc.desc) doc.desc = doc.description;
     if (doc.desc && !doc.description) doc.description = doc.desc;
 
+    // Attach non-enumerable .save() method to support legacy Mongoose calls on plain doc
+    Object.defineProperty(doc, 'save', {
+      value: async function() {
+        return await this._model.findByIdAndUpdate(this.id, this);
+      }.bind({ _model: this }),
+      enumerable: false,
+      writable: true,
+      configurable: true
+    });
+
     return doc;
   }
 
@@ -230,26 +240,58 @@ class PgModel {
   }
 
   async findById(id) {
-    if (!id) return null;
+    if (!id && id !== 0) return null;
     const pool = getPool();
     if (!pool) return null;
 
-    let condition = 'id = $1';
-    let val = id;
-
-    if (typeof id === 'string' && /^\d+$/.test(id)) {
-      val = parseInt(id, 10);
-    } else if (typeof id === 'string') {
-      condition = 'id::text = $1 OR emp_id = $1';
+    if (typeof id === 'number' || (typeof id === 'string' && /^\d+$/.test(id))) {
+      const val = parseInt(id, 10);
+      const sql = `SELECT * FROM "${this.tableName}" WHERE id = $1 LIMIT 1`;
+      try {
+        const res = await pool.query(sql, [val]);
+        return res.rows.length > 0 ? this.rowToDoc(res.rows[0]) : null;
+      } catch (e) {
+        return null;
+      }
     }
 
-    const sql = `SELECT * FROM "${this.tableName}" WHERE ${condition} LIMIT 1`;
-    try {
-      const res = await pool.query(sql, [val]);
-      return res.rows.length > 0 ? this.rowToDoc(res.rows[0]) : null;
-    } catch (e) {
-      return null;
+    if (typeof id === 'string') {
+      const strId = id.trim();
+      const cleanId = strId.replace(/^inv_/, '').trim();
+      const whereParts = ['id::text = $1'];
+      const params = [strId];
+
+      if (this.tableName === 'employees' && (this.fields.empId || this.fields.emp_id)) {
+        params.push(strId);
+        whereParts.push(`"${this._col('empId')}"::text = $${params.length}`);
+      }
+      if (this.fields.invoiceNo || this.fields.invoice_no) {
+        params.push(cleanId);
+        whereParts.push(`"${this._col('invoiceNo')}"::text = $${params.length}`);
+        if (cleanId !== strId) {
+          params.push(strId);
+          whereParts.push(`"${this._col('invoiceNo')}"::text = $${params.length}`);
+        }
+      }
+      if (this.tableName === 'customers' && (this.fields.customerId || this.fields.customer_id)) {
+        params.push(strId);
+        whereParts.push(`"${this._col('customerId')}"::text = $${params.length}`);
+      }
+      if (this.tableName === 'machinery_expenses' && (this.fields.machineId || this.fields.machine_id)) {
+        params.push(strId);
+        whereParts.push(`"${this._col('machineId')}"::text = $${params.length}`);
+      }
+
+      const sql = `SELECT * FROM "${this.tableName}" WHERE ${whereParts.join(' OR ')} LIMIT 1`;
+      try {
+        const res = await pool.query(sql, params);
+        return res.rows.length > 0 ? this.rowToDoc(res.rows[0]) : null;
+      } catch (e) {
+        return null;
+      }
     }
+
+    return null;
   }
 
   async countDocuments(filter = {}) {
@@ -321,9 +363,17 @@ class PgModel {
     }
 
     setClauses.push(`"updated_at" = NOW()`);
-    params.push(typeof id === 'string' && /^\d+$/.test(id) ? parseInt(id, 10) : id);
+    let targetPk = id;
+    if (typeof id === 'number' || (typeof id === 'string' && /^\d+$/.test(id))) {
+      targetPk = parseInt(id, 10);
+    } else if (typeof id === 'string') {
+      const existing = await this.findById(id);
+      if (!existing) return null;
+      targetPk = existing.id;
+    }
+    params.push(targetPk);
 
-    const sql = `UPDATE "${this.tableName}" SET ${setClauses.join(', ')} WHERE id::text = $${params.length} RETURNING *`;
+    const sql = `UPDATE "${this.tableName}" SET ${setClauses.join(', ')} WHERE id = $${params.length} RETURNING *`;
     const res = await pool.query(sql, params);
     return res.rows.length > 0 ? this.rowToDoc(res.rows[0]) : null;
   }
@@ -372,9 +422,17 @@ class PgModel {
     const pool = getPool();
     if (!pool) return null;
 
-    const val = typeof id === 'string' && /^\d+$/.test(id) ? parseInt(id, 10) : id;
-    const sql = `DELETE FROM "${this.tableName}" WHERE id::text = $1 RETURNING *`;
-    const res = await pool.query(sql, [String(val)]);
+    let targetPk = id;
+    if (typeof id === 'number' || (typeof id === 'string' && /^\d+$/.test(id))) {
+      targetPk = parseInt(id, 10);
+    } else if (typeof id === 'string') {
+      const existing = await this.findById(id);
+      if (!existing) return null;
+      targetPk = existing.id;
+    }
+
+    const sql = `DELETE FROM "${this.tableName}" WHERE id = $1 RETURNING *`;
+    const res = await pool.query(sql, [targetPk]);
     return res.rows.length > 0 ? this.rowToDoc(res.rows[0]) : null;
   }
 

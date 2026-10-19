@@ -123,16 +123,75 @@ exports.updateElectricityExpense = async (req, res, next) => {
     const { id } = req.params;
     const isDbConnected = mongoose.connection.readyState === 1;
 
-    if (isDbConnected && isValidObjectId(id)) {
-      const bill = await ElectricityExpense.findByIdAndUpdate(id, req.body, { new: true, runValidators: true });
-      if (!bill) return res.status(404).json({ success: false, error: 'Electricity bill record not found' });
+    if (isDbConnected) {
+      const existing = await ElectricityExpense.findById(id);
+      if (!existing) return res.status(404).json({ success: false, error: 'Electricity bill record not found' });
+
+      const prev = req.body.prev !== undefined ? Number(req.body.prev) : Number(existing.prev || 0);
+      const curr = req.body.curr !== undefined ? Number(req.body.curr) : Number(existing.curr || 0);
+      const units = req.body.units !== undefined ? Number(req.body.units) : Math.max(0, curr - prev);
+      const rate = req.body.rate !== undefined ? Number(req.body.rate) : Number(existing.rate || 0);
+      const fixed = req.body.fixed !== undefined ? Number(req.body.fixed) : Number(existing.fixed || 0);
+      const additional = req.body.additional !== undefined ? Number(req.body.additional) : Number(existing.additional || 0);
+      const total = req.body.total !== undefined ? Number(req.body.total) : ((units * rate) + fixed + additional);
+      const paidAmount = req.body.paidAmount !== undefined && req.body.paidAmount !== null && req.body.paidAmount !== ''
+        ? Number(req.body.paidAmount)
+        : Number(existing.paidAmount || 0);
+      const balanceAmount = req.body.balanceAmount !== undefined && req.body.balanceAmount !== null && req.body.balanceAmount !== ''
+        ? Number(req.body.balanceAmount)
+        : Math.max(0, total - paidAmount);
+      const effectiveStatus = total > 0 && balanceAmount === 0 ? 'Paid' : (req.body.status || existing.status || 'Pending');
+
+      const bill = await ElectricityExpense.findByIdAndUpdate(existing.id, {
+        ...req.body,
+        prev,
+        curr,
+        units,
+        rate,
+        fixed,
+        additional,
+        total,
+        paidAmount,
+        balanceAmount,
+        status: effectiveStatus
+      }, { new: true, runValidators: true });
+
       return res.json({ success: true, data: bill });
     }
 
     const idx = runtimeStore.electricityExpenses.findIndex(e => e._id === id || e.id === id);
     if (idx === -1) return res.status(404).json({ success: false, error: 'Electricity bill record not found' });
 
-    runtimeStore.electricityExpenses[idx] = { ...runtimeStore.electricityExpenses[idx], ...req.body };
+    const existing = runtimeStore.electricityExpenses[idx];
+    const prev = req.body.prev !== undefined ? Number(req.body.prev) : Number(existing.prev || 0);
+    const curr = req.body.curr !== undefined ? Number(req.body.curr) : Number(existing.curr || 0);
+    const units = req.body.units !== undefined ? Number(req.body.units) : Math.max(0, curr - prev);
+    const rate = req.body.rate !== undefined ? Number(req.body.rate) : Number(existing.rate || 0);
+    const fixed = req.body.fixed !== undefined ? Number(req.body.fixed) : Number(existing.fixed || 0);
+    const additional = req.body.additional !== undefined ? Number(req.body.additional) : Number(existing.additional || 0);
+    const total = req.body.total !== undefined ? Number(req.body.total) : ((units * rate) + fixed + additional);
+    const paidAmount = req.body.paidAmount !== undefined && req.body.paidAmount !== null && req.body.paidAmount !== ''
+      ? Number(req.body.paidAmount)
+      : Number(existing.paidAmount || 0);
+    const balanceAmount = req.body.balanceAmount !== undefined && req.body.balanceAmount !== null && req.body.balanceAmount !== ''
+      ? Number(req.body.balanceAmount)
+      : Math.max(0, total - paidAmount);
+    const effectiveStatus = total > 0 && balanceAmount === 0 ? 'Paid' : (req.body.status || existing.status || 'Pending');
+
+    runtimeStore.electricityExpenses[idx] = {
+      ...existing,
+      ...req.body,
+      prev,
+      curr,
+      units,
+      rate,
+      fixed,
+      additional,
+      total,
+      paidAmount,
+      balanceAmount,
+      status: effectiveStatus
+    };
     res.json({ success: true, data: runtimeStore.electricityExpenses[idx] });
   } catch (error) {
     next(error);
