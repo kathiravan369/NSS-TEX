@@ -649,7 +649,7 @@ export default function OilPurchase() {
           setEditingId(null);
         }}
         title={editingId ? 'Edit Oil Purchase' : 'Record Oil Purchase'}
-        maxWidth="840px"
+        maxWidth="920px"
       >
         <form onSubmit={handleSubmit} style={{ width: '100%', boxSizing: 'border-box' }}>
           <div className="erp-form-grid">
@@ -1127,7 +1127,7 @@ export default function OilPurchase() {
       </div>
 
       {/* View Details Modal: Shows Invoice No, Oil Type, Subtotal, GST, etc. */}
-      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Oil Purchase Details">
+      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Oil Purchase Details" maxWidth="780px">
         {viewingItem && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>

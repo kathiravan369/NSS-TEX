@@ -1,8 +1,24 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
-export default function Modal({ isOpen, onClose, title, children, maxWidth = '600px' }) {
+const SIZES = {
+  sm: '560px',
+  md: '760px',
+  lg: '940px',
+  xl: '1120px',
+  full: '96vw'
+};
+
+export default function Modal({ isOpen, onClose, title, children, maxWidth = '880px', size }) {
   if (!isOpen) return null;
+
+  // Resolve modal max-width based on size preset or custom maxWidth
+  let resolvedMaxWidth = '880px';
+  if (size && SIZES[size]) {
+    resolvedMaxWidth = SIZES[size];
+  } else if (maxWidth && maxWidth !== '600px') {
+    resolvedMaxWidth = maxWidth;
+  }
 
   return (
     <div
@@ -13,12 +29,12 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = '60
         right: 0,
         bottom: 0,
         backgroundColor: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(3px)',
+        backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 9999,
-        padding: '1rem'
+        padding: '1.25rem'
       }}
       onClick={onClose}
     >
@@ -27,11 +43,11 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = '60
           backgroundColor: '#ffffff',
           borderRadius: 'var(--radius-lg)',
           width: '100%',
-          maxWidth,
-          maxHeight: '90vh',
+          maxWidth: resolvedMaxWidth,
+          maxHeight: '92vh',
           overflowY: 'auto',
           overflowX: 'hidden',
-          boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+          boxShadow: '0 25px 35px -5px rgba(0, 0, 0, 0.2), 0 12px 16px -6px rgba(0, 0, 0, 0.12)',
           border: '1px solid var(--border-color)',
           display: 'flex',
           flexDirection: 'column',

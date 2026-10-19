@@ -583,7 +583,7 @@ export default function CustomerDetails() {
           setDuplicateWarning(null);
         }}
         title={editingId ? 'Edit Customer Profile' : 'Add New Customer'}
-        maxWidth="820px"
+        maxWidth="920px"
       >
         <form onSubmit={(e) => handleSubmit(e, false)} style={{ width: '100%' }}>
           {/* Duplicate Warning Alert */}
@@ -1081,7 +1081,7 @@ export default function CustomerDetails() {
           isOpen={!!viewingCustomer}
           onClose={() => setViewingCustomer(null)}
           title={`Customer Profile — ${viewingCustomer.name}`}
-          maxWidth="720px"
+          maxWidth="820px"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {/* Quick Profile Card */}

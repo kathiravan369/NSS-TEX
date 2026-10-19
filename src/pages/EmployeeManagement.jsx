@@ -657,7 +657,7 @@ export default function EmployeeManagement() {
           setFormData(INITIAL_FORM);
         }}
         title={editingId ? 'Edit Employee Details' : 'Add New Employee'}
-        maxWidth="860px"
+        maxWidth="940px"
       >
         <form onSubmit={handleSubmit} style={{ width: '100%', boxSizing: 'border-box' }}>
           <div className="erp-form-grid">
@@ -1049,7 +1049,7 @@ export default function EmployeeManagement() {
       </Modal>
 
       {/* View Details Modal */}
-      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Employee Profile Details">
+      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Employee Profile Details" maxWidth="780px">
         {viewingItem && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>

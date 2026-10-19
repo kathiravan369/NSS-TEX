@@ -472,7 +472,7 @@ export default function InvoiceView() {
           isOpen={isPaymentModalOpen}
           onClose={() => setIsPaymentModalOpen(false)}
           title={`Record Payment for ${invoice.invoiceNo}`}
-          maxWidth="500px"
+          maxWidth="620px"
         >
           <form onSubmit={handleRecordPayment}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>

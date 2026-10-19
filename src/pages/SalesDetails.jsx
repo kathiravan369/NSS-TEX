@@ -992,7 +992,7 @@ export default function SalesDetails() {
           isOpen={!!paymentInvoice}
           onClose={() => setPaymentInvoice(null)}
           title={`Collect Payment for Invoice ${paymentInvoice.invoiceNo}`}
-          maxWidth="480px"
+          maxWidth="620px"
         >
           <form onSubmit={handleRecordPayment}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>

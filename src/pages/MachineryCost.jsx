@@ -665,7 +665,7 @@ export default function MachineryCost() {
           setEditingId(null);
         }}
         title={editingId ? 'Edit Machinery Expense' : 'Add Machinery Expense'}
-        maxWidth="840px"
+        maxWidth="920px"
       >
         <form onSubmit={handleSubmit} style={{ width: '100%', boxSizing: 'border-box' }}>
           <div className="erp-form-grid">
@@ -1110,7 +1110,7 @@ export default function MachineryCost() {
       </div>
 
       {/* View Details Modal */}
-      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Machinery Expense Details">
+      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Machinery Expense Details" maxWidth="780px">
         {viewingItem && (() => {
           const vTotal = Number(viewingItem.total || 0);
           const vPaid = viewingItem.paidAmount !== undefined && viewingItem.paidAmount !== null && viewingItem.paidAmount !== ''

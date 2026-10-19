@@ -343,7 +343,7 @@ export default function ElectricityCost() {
           setEditingId(null);
         }}
         title={editingId ? 'Edit Electricity Bill' : 'Record Electricity Bill'}
-        maxWidth="840px"
+        maxWidth="920px"
       >
         <form onSubmit={handleSubmit} style={{ width: '100%', boxSizing: 'border-box' }}>
           <div className="erp-form-grid">
@@ -604,7 +604,7 @@ export default function ElectricityCost() {
       </div>
 
       {/* View Details Modal */}
-      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Electricity Bill Details">
+      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Electricity Bill Details" maxWidth="760px">
         {viewingItem && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
