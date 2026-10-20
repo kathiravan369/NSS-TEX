@@ -25,6 +25,7 @@ import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
 import DateRangePicker from '../components/common/DateRangePicker';
+import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
 import { storageService } from '../services/storageService';
 import {
   formatINR,
@@ -45,7 +46,7 @@ const defaultDueDate = calculateDefaultDueDate(defaultToday, 45);
 const INITIAL_FORM = {
   date: defaultToday,
   dueDate: defaultDueDate,
-  oilType: 'Machine Oil',
+  oilType: '',
   supplier: '',
   qty: '',
   unit: 'Litre',
@@ -54,7 +55,8 @@ const INITIAL_FORM = {
   invoiceNo: '',
   paidAmount: '',
   status: 'Paid',
-  notes: ''
+  notes: '',
+  cottonItems: []
 };
 
 export default function OilPurchase() {
@@ -114,9 +116,47 @@ export default function OilPurchase() {
     setTimeout(() => setToast(null), 3500);
   };
 
+  // Dynamic Cotton Varieties Management
+  const handleAddCottonItem = () => {
+    setFormData(prev => ({
+      ...prev,
+      cottonItems: [
+        ...(prev.cottonItems || []),
+        {
+          id: `cotton_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          name: '',
+          qty: '',
+          unit: 'Kg',
+          rate: ''
+        }
+      ]
+    }));
+  };
+
+  const handleCottonItemChange = (index, field, value) => {
+    setFormData(prev => {
+      const updated = [...(prev.cottonItems || [])];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, cottonItems: updated };
+    });
+  };
+
+  const handleRemoveCottonItem = (index) => {
+    setFormData(prev => {
+      const updated = (prev.cottonItems || []).filter((_, idx) => idx !== index);
+      return { ...prev, cottonItems: updated };
+    });
+  };
+
   // Live Auto-Calculations
-  const cost = (Number(formData.qty) || 0) * (Number(formData.rate) || 0);
-  const gstAmount = formData.includeGST ? cost * 0.05 : 0;
+  const isCotton = formData.oilType === 'Cotton';
+  const totalCottonQty = isCotton
+    ? (formData.cottonItems || []).reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0)
+    : 0;
+  const cost = isCotton
+    ? (formData.cottonItems || []).reduce((acc, curr) => acc + ((Number(curr.qty) || 0) * (Number(curr.rate) || 0)), 0)
+    : ((Number(formData.qty) || 0) * (Number(formData.rate) || 0));
+  const gstAmount = formData.includeGST ? (cost * 0.05) : 0;
   const finalAmount = cost + gstAmount;
 
   const currentPaid = formData.paidAmount !== '' && formData.paidAmount !== undefined
@@ -159,6 +199,16 @@ export default function OilPurchase() {
     const set = new Set();
     items.forEach((item) => {
       const name = item.supplier?.trim();
+      if (name) set.add(name);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+
+  // Dynamic list of oil / material types from items
+  const oilTypeOptions = useMemo(() => {
+    const set = new Set();
+    items.forEach((item) => {
+      const name = item.oilType?.trim();
       if (name) set.add(name);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
@@ -252,9 +302,46 @@ export default function OilPurchase() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.oilType || !formData.supplier || !formData.qty || !formData.rate) {
+    const isCotton = formData.oilType === 'Cotton';
+
+    if (!formData.oilType || !formData.supplier?.trim()) {
       showToast('Please fill all required fields.', 'error');
       return;
+    }
+
+    if (isCotton) {
+      if (!formData.cottonItems || formData.cottonItems.length === 0) {
+        showToast('Please add at least one cotton variety.', 'error');
+        return;
+      }
+      for (let i = 0; i < formData.cottonItems.length; i++) {
+        const row = formData.cottonItems[i];
+        if (!row.name || !row.name.trim()) {
+          showToast(`Please enter cotton type/name for row #${i + 1}.`, 'error');
+          return;
+        }
+        if (!row.qty || Number(row.qty) <= 0) {
+          showToast(`Please enter a valid quantity (> 0) for "${row.name || 'row #' + (i + 1)}".`, 'error');
+          return;
+        }
+        if (row.rate === '' || row.rate === undefined || Number(row.rate) < 0) {
+          showToast(`Please enter a valid rate (>= 0) for "${row.name}".`, 'error');
+          return;
+        }
+      }
+    } else {
+      if (!formData.qty || formData.rate === '' || formData.rate === undefined) {
+        showToast('Please fill all required fields.', 'error');
+        return;
+      }
+      if (Number(formData.qty) <= 0) {
+        showToast('Quantity must be greater than 0.', 'error');
+        return;
+      }
+      if (Number(formData.rate) < 0) {
+        showToast('Rate cannot be negative.', 'error');
+        return;
+      }
     }
 
     const effectivePaid = formData.paidAmount !== '' && formData.paidAmount !== undefined
@@ -273,11 +360,34 @@ export default function OilPurchase() {
 
     const effectiveDueDate = formData.dueDate || calculateDefaultDueDate(formData.date, 45);
 
+    let sanitizedItems = [];
+    let submittedQty = Number(formData.qty);
+    let submittedRate = Number(formData.rate);
+    let submittedUnit = formData.unit || 'Litre';
+
+    if (isCotton) {
+      sanitizedItems = formData.cottonItems.map((it, idx) => ({
+        id: it.id || `cotton_${Date.now()}_${idx}`,
+        name: it.name.trim(),
+        cottonType: it.name.trim(),
+        qty: Number(it.qty),
+        unit: it.unit || 'Kg',
+        rate: Number(it.rate),
+        subtotal: Math.round(Number(it.qty) * Number(it.rate) * 100) / 100
+      }));
+      submittedQty = totalCottonQty;
+      submittedUnit = sanitizedItems[0]?.unit || 'Kg';
+      submittedRate = totalCottonQty > 0 ? Math.round((cost / totalCottonQty) * 100) / 100 : 0;
+    }
+
     const payload = {
       ...formData,
+      oilType: formData.oilType,
+      items: sanitizedItems,
       dueDate: effectiveDueDate,
-      qty: Number(formData.qty),
-      rate: Number(formData.rate),
+      qty: submittedQty,
+      rate: submittedRate,
+      unit: submittedUnit,
       cost,
       gst: gstAmount,
       final: finalAmount,
@@ -291,11 +401,11 @@ export default function OilPurchase() {
 
     if (editingId) {
       await storageService.updateItem('oil', editingId, payload);
-      showToast('Oil purchase updated successfully.');
+      showToast(`${isCotton ? 'Cotton' : 'Oil'} purchase updated successfully.`);
       setEditingId(null);
     } else {
       await storageService.addItem('oil', payload);
-      showToast('Oil purchase recorded and stock updated.');
+      showToast(`${isCotton ? 'Cotton' : 'Oil'} purchase recorded successfully.`);
     }
 
     setIsModalOpen(false);
@@ -316,20 +426,31 @@ export default function OilPurchase() {
       ? item.paidAmount
       : (item.status === 'Paid' ? total : '');
 
+    const cottonItems = Array.isArray(item.items) && item.items.length > 0
+      ? item.items.map((it, idx) => ({
+          id: it.id || `cotton_${idx}`,
+          name: it.name || it.cottonType || '',
+          qty: it.qty ?? '',
+          unit: it.unit || 'Kg',
+          rate: it.rate ?? ''
+        }))
+      : [];
+
     setEditingId(item._id || item.id);
     setFormData({
       date: itemDate,
       dueDate: itemDueDate,
-      oilType: item.oilType || 'Machine Oil',
+      oilType: item.oilType || '',
       supplier: item.supplier || '',
       qty: item.qty || '',
-      unit: item.unit || 'Litre',
+      unit: item.unit || (item.oilType === 'Cotton' ? 'Kg' : 'Litre'),
       rate: item.rate || '',
       includeGST: item.includeGST ?? true,
       invoiceNo: item.invoiceNo || '',
       paidAmount: paid,
       status: item.status || 'Paid',
-      notes: item.notes || ''
+      notes: item.notes || '',
+      cottonItems
     });
     setIsModalOpen(true);
   };
@@ -451,9 +572,59 @@ export default function OilPurchase() {
         );
       }
     },
-    { key: 'supplier', header: 'Supplier' },
-    { key: 'qty', header: 'Qty', render: (val, row) => `${val} ${row.unit || 'Ltr'}` },
-    { key: 'rate', header: 'Rate (₹)', render: (val) => `₹ ${val}` },
+    {
+      key: 'supplier',
+      header: 'Supplier',
+      render: (val, row) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>{val}</span>
+          {row.oilType === 'Cotton' && (
+            <span style={{
+              fontSize: '0.68rem',
+              backgroundColor: '#eff6ff',
+              color: '#2563eb',
+              border: '1px solid #bfdbfe',
+              padding: '1px 6px',
+              borderRadius: '4px',
+              fontWeight: 600
+            }}>
+              Cotton
+            </span>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'qty',
+      header: 'Qty',
+      render: (val, row) => {
+        if (row.oilType === 'Cotton' && Array.isArray(row.items) && row.items.length > 0) {
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span>{val} {row.unit || 'Kg'}</span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                {row.items.length} {row.items.length === 1 ? 'type' : 'types'}
+              </span>
+            </div>
+          );
+        }
+        return `${val} ${row.unit || 'Ltr'}`;
+      }
+    },
+    {
+      key: 'rate',
+      header: 'Rate (₹)',
+      render: (val, row) => {
+        if (row.oilType === 'Cotton' && Array.isArray(row.items) && row.items.length > 1) {
+          return (
+            <span title={`Average Rate: ₹${val}`}>
+              ₹ {val} <small style={{ color: 'var(--text-muted)' }}>(avg)</small>
+            </span>
+          );
+        }
+        return `₹ ${val}`;
+      }
+    },
     {
       key: 'final',
       header: 'Amount',
@@ -648,7 +819,7 @@ export default function OilPurchase() {
           setIsModalOpen(false);
           setEditingId(null);
         }}
-        title={editingId ? 'Edit Oil Purchase' : 'Record Oil Purchase'}
+        title={editingId ? (formData.oilType === 'Cotton' ? 'Edit Cotton Purchase' : 'Edit Oil Purchase') : (formData.oilType === 'Cotton' ? 'Record Cotton Purchase' : 'Record Oil Purchase')}
         maxWidth="1120px"
       >
         <form onSubmit={handleSubmit} style={{ width: '100%', boxSizing: 'border-box' }}>
@@ -744,18 +915,21 @@ export default function OilPurchase() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Oil Type <span className="required">*</span></label>
-              <select
-                className="form-control"
+              <label className="form-label">Oil Type / Material Type <span className="required">*</span></label>
+              <DynamicTypeSelect
+                category="oil_type"
                 value={formData.oilType}
-                onChange={(e) => setFormData({ ...formData, oilType: e.target.value })}
+                onChange={(val) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    oilType: val,
+                    unit: val === 'Cotton' ? 'Kg' : (prev.unit === 'Kg' ? 'Litre' : prev.unit)
+                  }));
+                }}
+                label="Oil / Material Type"
+                placeholder="Select Oil / Material Type"
                 required
-              >
-                <option value="Machine Oil">Machine Oil</option>
-                <option value="Hydraulic Oil">Hydraulic Oil</option>
-                <option value="Gear Oil">Gear Oil</option>
-                <option value="Compressor Oil">Compressor Oil</option>
-              </select>
+              />
             </div>
 
             <div className="form-group">
@@ -770,45 +944,294 @@ export default function OilPurchase() {
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Quantity <span className="required">*</span></label>
-              <input
-                type="number"
-                min="1"
-                className="form-control"
-                placeholder="Enter quantity"
-                value={formData.qty}
-                onChange={(e) => setFormData({ ...formData, qty: e.target.value })}
-                required
-              />
-            </div>
+            {formData.oilType !== 'Cotton' ? (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Quantity <span className="required">*</span></label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-control"
+                    placeholder="Enter quantity"
+                    value={formData.qty}
+                    onChange={(e) => setFormData({ ...formData, qty: e.target.value })}
+                    required
+                  />
+                </div>
 
-            <div className="form-group">
-              <label className="form-label">Unit <span className="required">*</span></label>
-              <select
-                className="form-control"
-                value={formData.unit}
-                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-              >
-                <option value="Litre">Litre</option>
-                <option value="Barrel">Barrel</option>
-                <option value="Can">Can</option>
-              </select>
-            </div>
+                <div className="form-group">
+                  <label className="form-label">Unit <span className="required">*</span></label>
+                  <select
+                    className="form-control"
+                    value={formData.unit}
+                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                  >
+                    <option value="Litre">Litre</option>
+                    <option value="Barrel">Barrel</option>
+                    <option value="Can">Can</option>
+                  </select>
+                </div>
 
-            <div className="form-group">
-              <label className="form-label">Rate per Unit (₹) <span className="required">*</span></label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                className="form-control"
-                placeholder="Enter rate"
-                value={formData.rate}
-                onChange={(e) => setFormData({ ...formData, rate: e.target.value })}
-                required
-              />
-            </div>
+                <div className="form-group">
+                  <label className="form-label">Rate per Unit (₹) <span className="required">*</span></label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="form-control"
+                    placeholder="Enter rate"
+                    value={formData.rate}
+                    onChange={(e) => setFormData({ ...formData, rate: e.target.value })}
+                    required
+                  />
+                </div>
+              </>
+            ) : null}
+
+            {formData.oilType === 'Cotton' && (
+              <div className="form-group col-span-3" style={{ marginTop: '0.25rem', marginBottom: '0.5rem' }}>
+                <div style={{
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '1.25rem',
+                  backgroundColor: '#ffffff',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '1rem',
+                    flexWrap: 'wrap',
+                    gap: '0.75rem'
+                  }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        Cotton Rate Details
+                      </h4>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Configure dynamic cotton varieties with quantity and rate
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleAddCottonItem}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 14px',
+                        fontWeight: 600,
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      <Plus size={15} /> Add Cotton Type (+)
+                    </button>
+                  </div>
+
+                  {(!formData.cottonItems || formData.cottonItems.length === 0) ? (
+                    <div style={{
+                      padding: '2rem 1rem',
+                      textAlign: 'center',
+                      backgroundColor: '#f8fafc',
+                      border: '1.5px dashed #cbd5e1',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '0.65rem'
+                    }}>
+                      <div style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '50%',
+                        backgroundColor: '#e0f2fe',
+                        color: '#0284c7',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Plus size={22} />
+                      </div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.92rem' }}>
+                        No Cotton Varieties Added Yet
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: '440px', lineHeight: '1.4' }}>
+                        Click <strong>Add Cotton Type (+)</strong> to add custom varieties (e.g., White Cotton, Red Cotton, Blue Cotton, or any custom color).
+                      </p>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleAddCottonItem}
+                        style={{ marginTop: '0.25rem', fontWeight: 600 }}
+                      >
+                        <Plus size={14} /> Add Cotton Type (+)
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {formData.cottonItems.map((item, idx) => {
+                        const rowSubtotal = (Number(item.qty) || 0) * (Number(item.rate) || 0);
+                        return (
+                          <div
+                            key={item.id || idx}
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'minmax(180px, 2fr) minmax(100px, 1fr) minmax(100px, 1fr) minmax(110px, 1fr) minmax(120px, 1.2fr) 40px',
+                              gap: '0.75rem',
+                              alignItems: 'flex-end',
+                              padding: '0.85rem 1rem',
+                              backgroundColor: '#f8fafc',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: 'var(--radius-md)'
+                            }}
+                          >
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                Cotton Type / Name <span style={{ color: '#dc2626' }}>*</span>
+                              </label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                placeholder="e.g. White Cotton"
+                                value={item.name}
+                                onChange={(e) => handleCottonItemChange(idx, 'name', e.target.value)}
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                Quantity <span style={{ color: '#dc2626' }}>*</span>
+                              </label>
+                              <input
+                                type="number"
+                                min="0.01"
+                                step="any"
+                                className="form-control"
+                                placeholder="10"
+                                value={item.qty}
+                                onChange={(e) => handleCottonItemChange(idx, 'qty', e.target.value)}
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                Unit <span style={{ color: '#dc2626' }}>*</span>
+                              </label>
+                              <select
+                                className="form-control"
+                                value={item.unit || 'Kg'}
+                                onChange={(e) => handleCottonItemChange(idx, 'unit', e.target.value)}
+                              >
+                                <option value="Kg">Kg</option>
+                                <option value="Bale">Bale</option>
+                                <option value="Nos">Nos</option>
+                                <option value="Meter">Meter</option>
+                                <option value="Litre">Litre</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                Rate (₹) <span style={{ color: '#dc2626' }}>*</span>
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                className="form-control"
+                                placeholder="100"
+                                value={item.rate}
+                                onChange={(e) => handleCottonItemChange(idx, 'rate', e.target.value)}
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                Subtotal (₹)
+                              </label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                readOnly
+                                value={formatINR(rowSubtotal)}
+                                style={{
+                                  backgroundColor: '#ffffff',
+                                  fontWeight: 600,
+                                  color: 'var(--text-main)',
+                                  cursor: 'default'
+                                }}
+                              />
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingBottom: '2px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCottonItem(idx)}
+                                title="Remove cotton variety"
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#dc2626',
+                                  cursor: 'pointer',
+                                  padding: '6px',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                <Trash2 size={17} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Summary Banner below rows matching prompt specs */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.85rem 1.25rem',
+                        backgroundColor: '#f1f5f9',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid #e2e8f0',
+                        marginTop: '0.25rem',
+                        flexWrap: 'wrap',
+                        gap: '1rem'
+                      }}>
+                        <div style={{ display: 'flex', gap: '2.5rem', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Subtotal
+                            </div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary-600)' }}>
+                              {formatINR(cost)}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Total Quantity
+                            </div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                              {totalCottonQty} {formData.cottonItems[0]?.unit || 'Kg'}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>
+                          Illustrative values only. GST, amount paid and balance due should be calculated using your actual entries.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="form-group col-span-3" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.75rem', margin: '0.25rem 0' }}>
               <input
@@ -1013,10 +1436,9 @@ export default function OilPurchase() {
               }}
             >
               <option value="All Types">All Types</option>
-              <option value="Machine Oil">Machine Oil</option>
-              <option value="Hydraulic Oil">Hydraulic Oil</option>
-              <option value="Gear Oil">Gear Oil</option>
-              <option value="Compressor Oil">Compressor Oil</option>
+              {oilTypeOptions.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
             </select>
 
             <DateRangePicker
@@ -1127,7 +1549,7 @@ export default function OilPurchase() {
       </div>
 
       {/* View Details Modal: Shows Invoice No, Oil Type, Subtotal, GST, etc. */}
-      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title="Oil Purchase Details" maxWidth="1120px">
+      <Modal isOpen={!!viewingItem} onClose={() => setViewingItem(null)} title={viewingItem?.oilType === 'Cotton' ? 'Cotton Purchase Details' : 'Oil Purchase Details'} maxWidth="1120px">
         {viewingItem && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -1143,12 +1565,17 @@ export default function OilPurchase() {
                   {isOverdue(viewingItem) && ` (Overdue by ${getDaysOverdue(viewingItem)} days)`}
                 </span>
               </div>
-              <div><strong style={{ color: 'var(--text-muted)' }}>Oil Type:</strong> {viewingItem.oilType}</div>
+              <div><strong style={{ color: 'var(--text-muted)' }}>Material / Oil Type:</strong> {viewingItem.oilType}</div>
               <div><strong style={{ color: 'var(--text-muted)' }}>Supplier:</strong> {viewingItem.supplier}</div>
-              <div><strong style={{ color: 'var(--text-muted)' }}>Quantity:</strong> {viewingItem.qty} {viewingItem.unit || 'Ltr'}</div>
-              <div><strong style={{ color: 'var(--text-muted)' }}>Rate per Unit:</strong> ₹ {viewingItem.rate}</div>
+              <div><strong style={{ color: 'var(--text-muted)' }}>Total Quantity:</strong> {viewingItem.qty} {viewingItem.unit || (viewingItem.oilType === 'Cotton' ? 'Kg' : 'Ltr')}</div>
+              <div>
+                <strong style={{ color: 'var(--text-muted)' }}>Rate per Unit:</strong> ₹ {viewingItem.rate}
+                {viewingItem.oilType === 'Cotton' && Array.isArray(viewingItem.items) && viewingItem.items.length > 1 && (
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '4px' }}>(avg)</span>
+                )}
+              </div>
               <div><strong style={{ color: 'var(--text-muted)' }}>Subtotal Cost:</strong> {formatINR(viewingItem.cost)}</div>
-              <div><strong style={{ color: 'var(--text-muted)' }}>GST (5%):</strong> {formatINR(viewingItem.gst || 0)}</div>
+              <div><strong style={{ color: 'var(--text-muted)' }}>GST ({viewingItem.gstRate || 5}%):</strong> {formatINR(viewingItem.gst || 0)}</div>
               <div><strong style={{ color: 'var(--text-muted)' }}>Total Amount:</strong> <strong style={{ color: 'var(--primary-600)' }}>{formatINR(viewingItem.final || viewingItem.total)}</strong></div>
               <div>
                 <strong style={{ color: 'var(--text-muted)' }}>Paid:</strong>{' '}
@@ -1176,6 +1603,53 @@ export default function OilPurchase() {
               </div>
               <div><strong style={{ color: 'var(--text-muted)' }}>Payment Status:</strong> <StatusBadge status={isOverdue(viewingItem) ? 'Overdue' : getPaymentStatus(viewingItem)} /></div>
             </div>
+
+            {/* Cotton Varieties Breakdown Table */}
+            {viewingItem.oilType === 'Cotton' && Array.isArray(viewingItem.items) && viewingItem.items.length > 0 && (
+              <div style={{ marginTop: '0.25rem' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                  Cotton Varieties Breakdown ({viewingItem.items.length})
+                </h4>
+                <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                        <th style={{ padding: '8px 12px', color: 'var(--text-muted)', width: '45px' }}>#</th>
+                        <th style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>Cotton Variety / Name</th>
+                        <th style={{ padding: '8px 12px', color: 'var(--text-muted)', textAlign: 'right' }}>Quantity</th>
+                        <th style={{ padding: '8px 12px', color: 'var(--text-muted)', textAlign: 'right' }}>Rate (₹)</th>
+                        <th style={{ padding: '8px 12px', color: 'var(--text-muted)', textAlign: 'right' }}>Subtotal (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewingItem.items.map((it, idx) => (
+                        <tr key={it.id || idx} style={{ borderBottom: idx < viewingItem.items.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>{idx + 1}</td>
+                          <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-main)' }}>{it.name || it.cottonType}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right' }}>{it.qty} {it.unit || 'Kg'}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right' }}>₹ {it.rate}</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--primary-600)' }}>
+                            {formatINR(it.subtotal || ((Number(it.qty) || 0) * (Number(it.rate) || 0)))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot style={{ backgroundColor: '#f8fafc', borderTop: '1px solid var(--border-color)', fontWeight: 600 }}>
+                      <tr>
+                        <td colSpan={2} style={{ padding: '8px 12px' }}>Total</td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                          {viewingItem.items.reduce((s, x) => s + (Number(x.qty) || 0), 0)} {viewingItem.items[0]?.unit || 'Kg'}
+                        </td>
+                        <td></td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--primary-600)' }}>
+                          {formatINR(viewingItem.cost)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {viewingItem.notes && (
               <div style={{ marginTop: '0.5rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)' }}>

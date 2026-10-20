@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS oil_purchases (
   invoice_no VARCHAR(100) DEFAULT '',
   status VARCHAR(30) DEFAULT 'Pending',
   notes TEXT DEFAULT '',
+  items JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -195,6 +196,7 @@ ALTER TABLE oil_purchases ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(12,2) DEF
 ALTER TABLE oil_purchases ADD COLUMN IF NOT EXISTS balance_amount NUMERIC(12,2) DEFAULT 0;
 ALTER TABLE oil_purchases ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
 ALTER TABLE oil_purchases ADD COLUMN IF NOT EXISTS status VARCHAR(30) DEFAULT 'Pending';
+ALTER TABLE oil_purchases ADD COLUMN IF NOT EXISTS items JSONB DEFAULT '[]'::jsonb;
 
 ALTER TABLE machinery_expenses ADD COLUMN IF NOT EXISTS due_date DATE;
 ALTER TABLE machinery_expenses ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(12,2) DEFAULT 0;
@@ -304,4 +306,38 @@ CREATE TABLE IF NOT EXISTS sales_payments (
 
 CREATE INDEX IF NOT EXISTS idx_sales_payments_invoice_id ON sales_payments(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_sales_payments_payment_date ON sales_payments(payment_date);
+
+-- Master Types Table for Centralized Dynamic Types Management
+CREATE TABLE IF NOT EXISTS master_types (
+  id SERIAL PRIMARY KEY,
+  category VARCHAR(100) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  code VARCHAR(100) DEFAULT '',
+  description TEXT DEFAULT '',
+  extra_data JSONB DEFAULT '{}'::jsonb,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT uq_master_types_cat_name UNIQUE (category, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_master_types_cat ON master_types(category);
+CREATE INDEX IF NOT EXISTS idx_master_types_cat_active ON master_types(category, is_active);
+
+-- Populate initial master types from genuine existing transaction data (if any exists in DB)
+INSERT INTO master_types (category, name)
+SELECT DISTINCT 'thread_type', TRIM(thread_type) FROM thread_purchases WHERE thread_type IS NOT NULL AND TRIM(thread_type) != ''
+ON CONFLICT (category, name) DO NOTHING;
+
+INSERT INTO master_types (category, name)
+SELECT DISTINCT 'oil_type', TRIM(oil_type) FROM oil_purchases WHERE oil_type IS NOT NULL AND TRIM(oil_type) != ''
+ON CONFLICT (category, name) DO NOTHING;
+
+INSERT INTO master_types (category, name)
+SELECT DISTINCT 'machine_name', TRIM(machine) FROM machinery_expenses WHERE machine IS NOT NULL AND TRIM(machine) != ''
+ON CONFLICT (category, name) DO NOTHING;
+
+INSERT INTO master_types (category, name)
+SELECT DISTINCT 'expense_category', TRIM(category) FROM machinery_expenses WHERE category IS NOT NULL AND TRIM(category) != ''
+ON CONFLICT (category, name) DO NOTHING;
 

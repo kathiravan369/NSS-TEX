@@ -11,7 +11,8 @@ const runtimeStore = {
   weeklyPayroll: [],
   customers: [],
   invoices: [],
-  salesPayments: []
+  salesPayments: [],
+  types: []
 };
 
 module.exports = runtimeStore;

@@ -27,6 +27,7 @@ import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
 import DateRangePicker from '../components/common/DateRangePicker';
+import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
 import { storageService } from '../services/storageService';
 import { api } from '../services/api';
 import { formatINR, formatDate } from '../utils/formatters';
@@ -41,7 +42,7 @@ const INITIAL_FORM = {
   companyName: '',
   gstin: '',
   pan: '',
-  customerCategory: 'Regular',
+  customerCategory: '',
   billingAddress: {
     addressLine: '',
     city: '',
@@ -61,7 +62,7 @@ const INITIAL_FORM = {
   openingBalanceType: 'Debit',
   creditLimit: 200000,
   paymentTerms: '30 Days',
-  priceList: 'Standard',
+  priceList: '',
   notes: '',
   tags: [],
   status: 'Active'
@@ -742,16 +743,13 @@ export default function CustomerDetails() {
               </div>
               <div className="form-group">
                 <label className="form-label">Customer Category</label>
-                <select
-                  className="form-control"
+                <DynamicTypeSelect
+                  category="customer_category"
                   value={formData.customerCategory}
-                  onChange={(e) => setFormData({ ...formData, customerCategory: e.target.value })}
-                >
-                  <option value="Regular">Regular</option>
-                  <option value="Wholesale">Wholesale</option>
-                  <option value="Retail">Retail</option>
-                  <option value="Distributor">Distributor</option>
-                </select>
+                  onChange={(val) => setFormData({ ...formData, customerCategory: val })}
+                  label="Customer Category"
+                  placeholder="Select Customer Category"
+                />
               </div>
             </div>
           </div>
@@ -972,15 +970,13 @@ export default function CustomerDetails() {
               </div>
               <div className="form-group">
                 <label className="form-label">Price List</label>
-                <select
-                  className="form-control"
+                <DynamicTypeSelect
+                  category="price_list"
                   value={formData.priceList}
-                  onChange={(e) => setFormData({ ...formData, priceList: e.target.value })}
-                >
-                  <option value="Standard">Standard</option>
-                  <option value="Wholesale">Wholesale</option>
-                  <option value="Special">Special</option>
-                </select>
+                  onChange={(val) => setFormData({ ...formData, priceList: val })}
+                  label="Price List"
+                  placeholder="Select Price List"
+                />
               </div>
             </div>
           </div>

@@ -18,6 +18,7 @@ import { storageService } from '../services/storageService';
 import { formatINR, formatDate } from '../utils/formatters';
 import Toast from '../components/common/Toast';
 import Modal from '../components/common/Modal';
+import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
 
 // Number to Words converter for Indian Rupees
 function numberToWords(num) {
@@ -72,7 +73,7 @@ export default function InvoiceView() {
   // Record Payment Modal
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
-  const [payMode, setPayMode] = useState('Bank Transfer');
+  const [payMode, setPayMode] = useState('');
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [payRef, setPayRef] = useState('');
   const [payNotes, setPayNotes] = useState('');
@@ -491,13 +492,14 @@ export default function InvoiceView() {
               </div>
               <div className="form-group">
                 <label className="form-label">Payment Mode</label>
-                <select className="form-control" value={payMode} onChange={(e) => setPayMode(e.target.value)}>
-                  <option value="Bank Transfer">Bank Transfer / NEFT</option>
-                  <option value="RTGS">RTGS</option>
-                  <option value="UPI">UPI</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="Cash">Cash</option>
-                </select>
+                <DynamicTypeSelect
+                  category="payment_mode"
+                  value={payMode}
+                  onChange={(val) => setPayMode(val)}
+                  label="Payment Mode"
+                  placeholder="Select Payment Mode"
+                  required
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Payment Date</label>

@@ -8,6 +8,7 @@ const WeeklyPayroll = require('./WeeklyPayroll');
 const Customer = require('./Customer');
 const Invoice = require('./Invoice');
 const SalesPayment = require('./SalesPayment');
+const MasterType = require('./MasterType');
 
 module.exports = {
   Employee,
@@ -19,6 +20,7 @@ module.exports = {
   WeeklyPayroll,
   Customer,
   Invoice,
-  SalesPayment
+  SalesPayment,
+  MasterType
 };
 

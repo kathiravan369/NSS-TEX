@@ -25,6 +25,7 @@ import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
 import DateRangePicker from '../components/common/DateRangePicker';
+import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
 import { storageService } from '../services/storageService';
 import { formatINR, formatDate, formatDateTime } from '../utils/formatters';
 import EmployeeSalarySidePanel from '../components/employee/EmployeeSalarySidePanel';
@@ -56,7 +57,7 @@ const INITIAL_FORM = {
   joinDate: new Date().toISOString().split('T')[0],
   workTypes: ['Day Salary'], // Array of selected: 'Day Salary', 'Count Salary', 'Size Salary'
   dailyRate: 600,
-  productType: 'Towels',
+  productType: '',
   pieceRate: 12,
   sizeRates: DEFAULT_SIZE_RATES,
   status: 'Active',
@@ -222,7 +223,7 @@ export default function EmployeeManagement() {
       workType: primaryTypeStr,
       dailyRate: formData.workTypes.includes('Day Salary') ? Number(formData.dailyRate) || 0 : 0,
       pieceRate: formData.workTypes.includes('Count Salary') ? Number(formData.pieceRate) || 0 : 0,
-      productType: formData.workTypes.includes('Count Salary') ? (formData.productType || 'Towels') : '',
+      productType: formData.workTypes.includes('Count Salary') ? (formData.productType || '') : '',
       sizeRates: formData.workTypes.includes('Size Salary') ? (formData.sizeRates || DEFAULT_SIZE_RATES) : []
     };
 
@@ -926,18 +927,14 @@ export default function EmployeeManagement() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Product Type <span className="required">*</span></label>
-                    <select
-                      className="form-control"
+                    <DynamicTypeSelect
+                      category="employee_product_type"
                       value={formData.productType}
-                      onChange={(e) => setFormData({ ...formData, productType: e.target.value })}
+                      onChange={(val) => setFormData({ ...formData, productType: val })}
+                      label="Product Type"
+                      placeholder="Select Product Type"
                       required
-                    >
-                      <option value="Towels">Towels</option>
-                      <option value="Bedsheets">Bedsheets</option>
-                      <option value="Pillow Covers">Pillow Covers</option>
-                      <option value="Napkins">Napkins</option>
-                      <option value="Curtains">Curtains</option>
-                    </select>
+                    />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Rate per Piece (₹) <span className="required">*</span></label>

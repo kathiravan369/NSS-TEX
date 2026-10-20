@@ -21,29 +21,14 @@ import {
 } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import Toast from '../components/common/Toast';
+import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
 import { storageService } from '../services/storageService';
 import { api } from '../services/api';
 import { formatINR, formatDate } from '../utils/formatters';
 
-// Standard towel product catalog for NSS-TEX
-export const DEFAULT_PRODUCTS = [
-  { name: 'Bath Towel - Large (30 × 60)', sku: 'TWL-BTH-L3060', category: 'Towels', unit: 'Pcs', rate: 160, gstRate: 12 },
-  { name: 'Bath Towel - Medium (27 × 54)', sku: 'TWL-BTH-M2754', category: 'Towels', unit: 'Pcs', rate: 130, gstRate: 12 },
-  { name: 'Bath Towel - Small (24 × 47)', sku: 'TWL-BTH-S2447', category: 'Towels', unit: 'Pcs', rate: 100, gstRate: 12 },
-  { name: 'Cotton Terry Hand Towel (16 × 24)', sku: 'TWL-HND-1624', category: 'Towels', unit: 'Pcs', rate: 70, gstRate: 12 },
-  { name: 'Face Towel / Napkin (12 × 12)', sku: 'TWL-FCE-1212', category: 'Towels', unit: 'Pcs', rate: 40, gstRate: 12 },
-  { name: 'Jacquard Dobby Border Towel', sku: 'TWL-JCQ-DOBBY', category: 'Towels', unit: 'Pcs', rate: 145, gstRate: 12 },
-  { name: 'Bleached Cotton Export Towel', sku: 'TWL-BLC-EXP', category: 'Towels', unit: 'Pcs', rate: 125, gstRate: 12 },
-  { name: 'Heavy GSM Bath Mat Terry', sku: 'TEX-MAT-GSM', category: 'Textiles', unit: 'Pcs', rate: 110, gstRate: 12 }
-];
-
-export const SALESPERSON_LIST = [
-  'K. Kathiravan (Director)',
-  'R. Sundaram (Senior Sales)',
-  'M. Prakash (Field Executive)',
-  'S. Venkatesh (Regional)',
-  'Direct Company Billing'
-];
+// Export empty defaults for backwards compatibility
+export const DEFAULT_PRODUCTS = [];
+export const SALESPERSON_LIST = [];
 
 export default function CreateInvoice() {
   const navigate = useNavigate();
@@ -76,7 +61,7 @@ export default function CreateInvoice() {
   const [poNumber, setPoNumber] = useState('');
   const [challanNo, setChallanNo] = useState('');
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
-  const [salesperson, setSalesperson] = useState('Direct Company Billing');
+  const [salesperson, setSalesperson] = useState('');
   const [dispatchNo, setDispatchNo] = useState('');
 
   // Shipping details override
@@ -88,6 +73,110 @@ export default function CreateInvoice() {
     pincode: '',
     country: 'India'
   });
+
+  // Dynamic Saved Products Catalog
+  const [savedProducts, setSavedProducts] = useState([]);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [activeItemIndexForProduct, setActiveItemIndexForProduct] = useState(null);
+  const [newProductForm, setNewProductForm] = useState({
+    name: '',
+    sku: '',
+    category: 'Towels',
+    unit: 'Pcs',
+    rate: '',
+    gstRate: 12
+  });
+  const [productError, setProductError] = useState('');
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
+
+  const loadSavedProducts = async () => {
+    try {
+      const res = await api.types.getByCategory('product', { limit: 500 });
+      if (res && res.success && Array.isArray(res.data)) {
+        setSavedProducts(res.data);
+      }
+    } catch (e) {
+      console.warn('Failed to load saved products:', e.message);
+    }
+  };
+
+  useEffect(() => {
+    loadSavedProducts();
+  }, []);
+
+  const openProductModal = (idx) => {
+    setActiveItemIndexForProduct(idx);
+    setNewProductForm({
+      name: '',
+      sku: '',
+      category: 'Towels',
+      unit: 'Pcs',
+      rate: '',
+      gstRate: 12
+    });
+    setProductError('');
+    setIsProductModalOpen(true);
+  };
+
+  const handleSaveProduct = async (e) => {
+    e.preventDefault();
+    if (!newProductForm.name.trim()) {
+      setProductError('Product name / description is required.');
+      return;
+    }
+
+    setIsSavingProduct(true);
+    setProductError('');
+    try {
+      const res = await api.types.create({
+        category: 'product',
+        name: newProductForm.name.trim(),
+        code: newProductForm.sku.trim(),
+        extraData: {
+          sku: newProductForm.sku.trim(),
+          category: newProductForm.category || 'Towels',
+          unit: newProductForm.unit || 'Pcs',
+          rate: Number(newProductForm.rate) || 0,
+          gstRate: Number(newProductForm.gstRate) !== undefined ? Number(newProductForm.gstRate) : 12
+        }
+      });
+
+      if (res && res.success && res.data) {
+        const created = res.data;
+        setSavedProducts(prev => {
+          const filtered = prev.filter(p => p.id !== created.id);
+          return [...filtered, created].sort((a, b) => a.name.localeCompare(b.name));
+        });
+
+        if (activeItemIndexForProduct !== null) {
+          const extra = created.extraData || {};
+          setItems(prevItems => {
+            const updated = [...prevItems];
+            if (updated[activeItemIndexForProduct]) {
+              updated[activeItemIndexForProduct] = {
+                ...updated[activeItemIndexForProduct],
+                productName: created.name,
+                sku: created.code || extra.sku || '',
+                category: extra.category || 'Towels',
+                unit: extra.unit || 'Pcs',
+                rate: Number(extra.rate) || 0,
+                gstRate: Number(extra.gstRate) !== undefined ? Number(extra.gstRate) : 12
+              };
+            }
+            return updated;
+          });
+        }
+        showToast('Product added to catalog successfully.', 'success');
+        setIsProductModalOpen(false);
+      } else {
+        setProductError(res.error || 'Failed to save product.');
+      }
+    } catch (err) {
+      setProductError(err.message || 'Error saving product.');
+    } finally {
+      setIsSavingProduct(false);
+    }
+  };
 
   // Line Items - Start with clean blank row
   const [items, setItems] = useState([
@@ -107,7 +196,7 @@ export default function CreateInvoice() {
   // Financials & Discounts
   const [extraDiscount, setExtraDiscount] = useState(0);
   const [initialPayment, setInitialPayment] = useState(0);
-  const [paymentMode, setPaymentMode] = useState('Bank Transfer');
+  const [paymentMode, setPaymentMode] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
 
   // Additional Details
@@ -148,7 +237,7 @@ export default function CreateInvoice() {
             setPoNumber(inv.poNumber || '');
             setChallanNo(inv.challanNo || '');
             setDeliveryDate(inv.deliveryDate ? new Date(inv.deliveryDate).toISOString().split('T')[0] : '');
-            setSalesperson(inv.salesperson || 'Direct Company Billing');
+            setSalesperson(inv.salesperson || '');
             setDispatchNo(inv.dispatchNo || '');
             setExtraDiscount(inv.extraDiscount || 0);
             setInitialPayment(inv.amountPaid || 0);
@@ -312,16 +401,17 @@ export default function CreateInvoice() {
   const handleItemChange = (idx, field, val) => {
     const updated = [...items];
     if (field === 'productSelect') {
-      const catalogItem = DEFAULT_PRODUCTS.find(p => p.name === val);
+      const catalogItem = savedProducts.find(p => p.name === val);
       if (catalogItem) {
+        const extra = catalogItem.extraData || {};
         updated[idx] = {
           ...updated[idx],
           productName: catalogItem.name,
-          sku: catalogItem.sku,
-          category: catalogItem.category,
-          unit: catalogItem.unit,
-          rate: catalogItem.rate,
-          gstRate: catalogItem.gstRate
+          sku: catalogItem.code || extra.sku || '',
+          category: extra.category || 'Towels',
+          unit: extra.unit || 'Pcs',
+          rate: Number(extra.rate) || 0,
+          gstRate: Number(extra.gstRate) !== undefined ? Number(extra.gstRate) : 12
         };
       }
     } else {
@@ -747,16 +837,14 @@ export default function CreateInvoice() {
               </div>
               <div className="form-group">
                 <label className="form-label" style={{ fontSize: '0.72rem' }}>Salesperson</label>
-                <select
-                  className="form-control"
-                  style={{ height: '32px', fontSize: '0.75rem' }}
+                <DynamicTypeSelect
+                  category="salesperson"
                   value={salesperson}
-                  onChange={(e) => setSalesperson(e.target.value)}
-                >
-                  {SALESPERSON_LIST.map(sp => (
-                    <option key={sp} value={sp}>{sp}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setSalesperson(val)}
+                  label="Salesperson"
+                  placeholder="Select Salesperson"
+                  style={{ height: '32px' }}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label" style={{ fontSize: '0.72rem' }}>Dispatch No</label>
@@ -814,26 +902,44 @@ export default function CreateInvoice() {
                 <tr key={row.id || idx}>
                   <td>{idx + 1}</td>
                   <td>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                      <select
-                        className="form-control"
-                        style={{ height: '30px', fontSize: '0.78rem' }}
-                        value={DEFAULT_PRODUCTS.some(p => p.name === row.productName) ? row.productName : 'custom'}
-                        onChange={(e) => {
-                          if (e.target.value !== 'custom') {
-                            handleItemChange(idx, 'productSelect', e.target.value);
-                          }
-                        }}
-                      >
-                        <option value="custom">-- Custom Product / Presets --</option>
-                        {DEFAULT_PRODUCTS.map(p => (
-                          <option key={p.name} value={p.name}>{p.name} (₹{p.rate})</option>
-                        ))}
-                      </select>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        <select
+                          className="form-control"
+                          style={{ height: '30px', fontSize: '0.78rem', flex: 1 }}
+                          value={savedProducts.some(p => p.name === row.productName) ? row.productName : ''}
+                          onChange={(e) => {
+                            if (e.target.value === '__ADD_PRODUCT__') {
+                              openProductModal(idx);
+                            } else if (e.target.value) {
+                              handleItemChange(idx, 'productSelect', e.target.value);
+                            }
+                          }}
+                        >
+                          <option value="">{savedProducts.length === 0 ? '-- No saved products --' : '-- Choose from Saved Products --'}</option>
+                          {savedProducts.map(p => (
+                            <option key={p.id || p.name} value={p.name}>
+                              {p.name} {p.extraData?.rate ? `(₹${p.extraData.rate})` : ''}
+                            </option>
+                          ))}
+                          <option value="__ADD_PRODUCT__" style={{ fontWeight: 600, color: 'var(--primary-600)' }}>
+                            + Add New Product...
+                          </option>
+                        </select>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ padding: '0 6px', height: '30px', minWidth: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Add / Save Product"
+                          onClick={() => openProductModal(idx)}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
                       <input
                         type="text"
                         className="form-control"
-                        placeholder="Product Description"
+                        placeholder="Product Description / Custom Name"
                         style={{ height: '28px', fontSize: '0.75rem' }}
                         value={row.productName}
                         onChange={(e) => handleItemChange(idx, 'productName', e.target.value)}
@@ -950,19 +1056,14 @@ export default function CreateInvoice() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
               <div className="form-group">
                 <label className="form-label" style={{ fontSize: '0.72rem' }}>Payment Mode</label>
-                <select
-                  className="form-control"
-                  style={{ height: '34px', fontSize: '0.78rem' }}
+                <DynamicTypeSelect
+                  category="payment_mode"
                   value={paymentMode}
-                  onChange={(e) => setPaymentMode(e.target.value)}
-                >
-                  <option value="Bank Transfer">Bank Transfer / NEFT</option>
-                  <option value="RTGS">RTGS</option>
-                  <option value="UPI">UPI</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Credit">Credit (Pay Later)</option>
-                </select>
+                  onChange={(val) => setPaymentMode(val)}
+                  label="Payment Mode"
+                  placeholder="Select Payment Mode"
+                  style={{ height: '34px' }}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label" style={{ fontSize: '0.72rem' }}>Amount Received (₹)</label>
@@ -1181,6 +1282,157 @@ export default function CreateInvoice() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Quick Add Product to Catalog Modal */}
+      <Modal
+        isOpen={isProductModalOpen}
+        onClose={() => setIsProductModalOpen(false)}
+        title="Add Product to Catalog"
+        maxWidth="600px"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {productError && (
+            <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#b91c1c', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <AlertTriangle size={15} />
+              <span>{productError}</span>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label className="form-label">Product Name / Description <span className="required">*</span></label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="e.g. Premium Cotton Bath Towel (30 × 60)"
+              value={newProductForm.name}
+              onChange={(e) => setNewProductForm({ ...newProductForm, name: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSaveProduct(e);
+                }
+              }}
+              required
+              autoFocus
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-group">
+              <label className="form-label">SKU / Item Code</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. TWL-BTH-3060"
+                value={newProductForm.sku}
+                onChange={(e) => setNewProductForm({ ...newProductForm, sku: e.target.value.toUpperCase() })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSaveProduct(e);
+                  }
+                }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. Towels, Bedding"
+                value={newProductForm.category}
+                onChange={(e) => setNewProductForm({ ...newProductForm, category: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSaveProduct(e);
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-group">
+              <label className="form-label">Unit</label>
+              <select
+                className="form-control"
+                value={newProductForm.unit}
+                onChange={(e) => setNewProductForm({ ...newProductForm, unit: e.target.value })}
+              >
+                <option value="Pcs">Pcs</option>
+                <option value="Dozens">Dozens</option>
+                <option value="Bundles">Bundles</option>
+                <option value="Kg">Kg</option>
+                <option value="Metres">Metres</option>
+                <option value="Nos">Nos</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Default Rate (₹)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="form-control"
+                placeholder="0.00"
+                value={newProductForm.rate}
+                onChange={(e) => setNewProductForm({ ...newProductForm, rate: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSaveProduct(e);
+                  }
+                }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">GST Rate (%)</label>
+              <select
+                className="form-control"
+                value={newProductForm.gstRate}
+                onChange={(e) => setNewProductForm({ ...newProductForm, gstRate: Number(e.target.value) })}
+              >
+                <option value={0}>0%</option>
+                <option value={5}>5%</option>
+                <option value={12}>12%</option>
+                <option value={18}>18%</option>
+                <option value={28}>28%</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '0.75rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsProductModalOpen(false)}
+              disabled={isSavingProduct}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={isSavingProduct}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSaveProduct(e);
+              }}
+            >
+              {isSavingProduct ? 'Saving...' : 'Save Product'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

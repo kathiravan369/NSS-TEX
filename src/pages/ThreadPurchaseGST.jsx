@@ -24,6 +24,7 @@ import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
 import DateRangePicker from '../components/common/DateRangePicker';
+import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
 import { storageService, cleanAccidentalDuplicates } from '../services/storageService';
 import {
   formatINR,
@@ -43,7 +44,7 @@ const INITIAL_FORM = {
   date: defaultToday,
   dueDate: calculateDefaultDueDate(defaultToday, 45),
   supplier: '',
-  threadType: 'Cotton',
+  threadType: '',
   qty: '',
   unit: 'Kg',
   rate: '',
@@ -313,7 +314,7 @@ export default function ThreadPurchaseGST() {
       date: itemDate,
       dueDate: itemDueDate,
       supplier: item.supplier || '',
-      threadType: item.threadType || 'Cotton',
+      threadType: item.threadType || '',
       qty: item.qty || '',
       unit: item.unit || 'Kg',
       rate: item.rate || '',
@@ -775,17 +776,14 @@ export default function ThreadPurchaseGST() {
             </div>
             <div className="form-group">
               <label className="form-label">Thread Type <span className="required">*</span></label>
-              <select
-                className="form-control"
+              <DynamicTypeSelect
+                category="thread_type"
                 value={formData.threadType}
-                onChange={(e) => setFormData({ ...formData, threadType: e.target.value })}
+                onChange={(val) => setFormData({ ...formData, threadType: val })}
+                label="Thread Type"
+                placeholder="Select Thread Type"
                 required
-              >
-                <option value="Cotton">Cotton</option>
-                <option value="Polyester">Polyester</option>
-                <option value="Nylon">Nylon</option>
-                <option value="Viscose">Viscose</option>
-              </select>
+              />
             </div>
             <div className="form-group">
               <label className="form-label">Quantity <span className="required">*</span></label>

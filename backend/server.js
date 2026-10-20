@@ -23,6 +23,7 @@ const reportRoutes = require('./routes/reportRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const invoiceRoutes = require('./routes/invoiceRoutes');
 const salesRoutes = require('./routes/salesRoutes');
+const typeRoutes = require('./routes/typeRoutes');
 
 const PORT = process.env.PORT || 5001;
 const DB_NAME = process.env.PGDATABASE || 'nss_towels';
@@ -108,6 +109,7 @@ app.use('/api/sales/customers', customerRoutes);
 app.use('/api/sales/invoices', invoiceRoutes);
 app.use('/api/sales/reports', salesRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/types', typeRoutes);
 
 // Centralized Error Handling
 app.use(errorHandler);

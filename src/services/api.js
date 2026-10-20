@@ -366,6 +366,41 @@ export const api = {
     check() {
       return request('/health');
     }
+  },
+
+  // 11. Master Types Endpoints
+  types: {
+    getByCategory(category, params = {}) {
+      return request(`/types${buildQuery({ category, ...params })}`);
+    },
+    getAll(params = {}) {
+      return request(`/types${buildQuery(params)}`);
+    },
+    getById(id) {
+      return request(`/types/${id}`);
+    },
+    create(data) {
+      return request('/types', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+    update(id, data) {
+      return request(`/types/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
+    toggleStatus(id) {
+      return request(`/types/${id}/toggle-status`, {
+        method: 'PATCH'
+      });
+    },
+    delete(id) {
+      return request(`/types/${id}`, {
+        method: 'DELETE'
+      });
+    }
   }
 };
 

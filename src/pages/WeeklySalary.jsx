@@ -25,6 +25,7 @@ import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import DateRangePicker from '../components/common/DateRangePicker';
+import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
 import { storageService } from '../services/storageService';
 import { formatINR, formatDate, formatDateTime } from '../utils/formatters';
 
@@ -50,7 +51,7 @@ const INITIAL_RECORD = {
   empId: '',
   employeeName: '',
   workType: '', // Assigned automatically once employee is selected
-  productName: 'Towel',
+  productName: '',
   workDate: defaultToday,
 
   // Size-Based Salary fields
@@ -433,7 +434,7 @@ export default function WeeklySalary() {
         empId: emp.empId,
         employeeName: emp.name,
         workType: newWorkType,
-        productName: emp.productType || prev.productName || 'Towel',
+        productName: emp.productType || prev.productName || '',
         dayRate: emp.dailyRate !== undefined && Number(emp.dailyRate) > 0 ? Number(emp.dailyRate) : prev.dayRate,
         pricePerItem: emp.pieceRate !== undefined && Number(emp.pieceRate) > 0 ? Number(emp.pieceRate) : prev.pricePerItem,
         sizeRates: nextSizeRates,
@@ -517,7 +518,7 @@ export default function WeeklySalary() {
       empId: recordForm.empId,
       employeeName: recordForm.employeeName,
       workType: recordForm.workType,
-      productName: recordForm.productName || 'Towel',
+      productName: recordForm.productName || '',
       workDate: recordForm.workDate || defaultToday,
       weekStart,
       weekEnd,
@@ -596,7 +597,7 @@ export default function WeeklySalary() {
       empId: item.empId || '',
       employeeName: item.employeeName || '',
       workType: resolvedType,
-      productName: item.productName || 'Towel',
+      productName: item.productName || '',
       workDate: item.workDate ? new Date(item.workDate).toISOString().split('T')[0] : defaultToday,
       sizeRates: loadedSizeRates,
       sizeProduction: loadedSizeProd,
@@ -1007,19 +1008,14 @@ export default function WeeklySalary() {
               <label className="form-label" style={{ fontWeight: 600 }}>
                 Product / Work <span style={{ color: '#dc2626' }}>*</span>
               </label>
-              <select
-                className="form-control"
+              <DynamicTypeSelect
+                category="employee_product_type"
                 value={recordForm.productName}
-                onChange={(e) => setRecordForm(prev => ({ ...prev, productName: e.target.value }))}
-                style={{ height: '38px', backgroundColor: '#ffffff' }}
-              >
-                <option value="Towel">Towel</option>
-                <option value="Bath Towel">Bath Towel</option>
-                <option value="Hand Towel">Hand Towel</option>
-                <option value="Face Napkin">Face Napkin</option>
-                <option value="Bed Sheet">Bed Sheet</option>
-                <option value="Kitchen Linen">Kitchen Linen</option>
-              </select>
+                onChange={(val) => setRecordForm(prev => ({ ...prev, productName: val }))}
+                label="Product / Work"
+                placeholder="Select Product / Work"
+                required
+              />
             </div>
 
             {/* 4. Work Date */}
@@ -1759,7 +1755,7 @@ export default function WeeklySalary() {
               <div><strong style={{ color: 'var(--text-muted)' }}>Employee:</strong> {viewingItem.employeeName} ({viewingItem.empId})</div>
               <div><strong style={{ color: 'var(--text-muted)' }}>Work Type:</strong> {viewingItem.workType}</div>
               <div><strong style={{ color: 'var(--text-muted)' }}>Work Date:</strong> {formatDate(viewingItem.workDate || viewingItem.weekStart)}</div>
-              <div><strong style={{ color: 'var(--text-muted)' }}>Product:</strong> {viewingItem.productName || 'Towel'}</div>
+              <div><strong style={{ color: 'var(--text-muted)' }}>Product:</strong> {viewingItem.productName || '-'}</div>
               <div><strong style={{ color: 'var(--text-muted)' }}>Work Hours:</strong> {viewingItem.hoursWorked || 8} hrs</div>
               <div><strong style={{ color: 'var(--text-muted)' }}>Leave Days:</strong> {viewingItem.leaveDays || 0}</div>
               <div><strong style={{ color: 'var(--text-muted)' }}>Gross Pay:</strong> {formatINR(viewingItem.grossPay)}</div>

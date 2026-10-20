@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 const SIZES = {
@@ -20,7 +21,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = '11
     resolvedMaxWidth = maxWidth;
   }
 
-  return (
+  const modalNode = (
     <div
       style={{
         position: 'fixed',
@@ -91,4 +92,9 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = '11
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(modalNode, document.body);
+  }
+  return modalNode;
 }

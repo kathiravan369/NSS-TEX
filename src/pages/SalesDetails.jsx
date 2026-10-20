@@ -29,10 +29,10 @@ import Modal from '../components/common/Modal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import DateRangePicker from '../components/common/DateRangePicker';
+import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
 import { storageService } from '../services/storageService';
 import { api } from '../services/api';
 import { formatINR, formatDate } from '../utils/formatters';
-import { SALESPERSON_LIST } from './CreateInvoice';
 
 export default function SalesDetails() {
   const navigate = useNavigate();
@@ -66,7 +66,7 @@ export default function SalesDetails() {
   // Payment Modal
   const [paymentInvoice, setPaymentInvoice] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMode, setPaymentMode] = useState('Bank Transfer');
+  const [paymentMode, setPaymentMode] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentRef, setPaymentRef] = useState('');
 
@@ -1017,13 +1017,14 @@ export default function SalesDetails() {
 
               <div className="form-group">
                 <label className="form-label">Payment Mode</label>
-                <select className="form-control" value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
-                  <option value="Bank Transfer">Bank Transfer / NEFT</option>
-                  <option value="RTGS">RTGS</option>
-                  <option value="UPI">UPI</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="Cash">Cash</option>
-                </select>
+                <DynamicTypeSelect
+                  category="payment_mode"
+                  value={paymentMode}
+                  onChange={(val) => setPaymentMode(val)}
+                  label="Payment Mode"
+                  placeholder="Select Payment Mode"
+                  required
+                />
               </div>
 
               <div className="form-group">

@@ -24,6 +24,7 @@ import ConfirmDialog from '../components/common/ConfirmDialog';
 import Toast from '../components/common/Toast';
 import StatusBadge from '../components/common/StatusBadge';
 import DateRangePicker from '../components/common/DateRangePicker';
+import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
 import { storageService, cleanAccidentalDuplicates } from '../services/storageService';
 import {
   formatINR,
@@ -42,9 +43,9 @@ const defaultToday = new Date().toISOString().split('T')[0];
 const INITIAL_FORM = {
   date: defaultToday,
   dueDate: calculateDefaultDueDate(defaultToday, 45),
-  machine: 'Loom Machine',
+  machine: '',
   machineId: '',
-  category: 'Maintenance',
+  category: '',
   desc: '',
   qty: 1,
   unit: 'Nos',
@@ -334,9 +335,9 @@ export default function MachineryCost() {
     setFormData({
       date: itemDate,
       dueDate: itemDueDate,
-      machine: item.machine || 'Loom Machine',
+      machine: item.machine || '',
       machineId: item.machineId || '',
-      category: item.category || 'Maintenance',
+      category: item.category || '',
       desc: item.desc || '',
       qty: item.qty || 1,
       unit: item.unit || 'Nos',
@@ -738,19 +739,14 @@ export default function MachineryCost() {
             </div>
             <div className="form-group">
               <label className="form-label">Machine Name <span className="required">*</span></label>
-              <select
-                className="form-control"
+              <DynamicTypeSelect
+                category="machine_name"
                 value={formData.machine}
-                onChange={(e) => setFormData({ ...formData, machine: e.target.value })}
+                onChange={(val) => setFormData({ ...formData, machine: val })}
+                label="Machine"
+                placeholder="Select Machine"
                 required
-              >
-                <option value="Loom Machine">Loom Machine</option>
-                <option value="Power Loom">Power Loom</option>
-                <option value="Dyeing Machine">Dyeing Machine</option>
-                <option value="Compressor">Compressor</option>
-                <option value="Generator">Generator</option>
-                <option value="Finishing Machine">Finishing Machine</option>
-              </select>
+              />
             </div>
             <div className="form-group">
               <label className="form-label">Machine ID</label>
@@ -764,18 +760,14 @@ export default function MachineryCost() {
             </div>
             <div className="form-group">
               <label className="form-label">Expense Category <span className="required">*</span></label>
-              <select
-                className="form-control"
+              <DynamicTypeSelect
+                category="expense_category"
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                onChange={(val) => setFormData({ ...formData, category: val })}
+                label="Expense Category"
+                placeholder="Select Expense Category"
                 required
-              >
-                <option value="Maintenance">Maintenance</option>
-                <option value="Repair">Repair</option>
-                <option value="Spare Parts">Spare Parts</option>
-                <option value="Purchase">Purchase</option>
-                <option value="Other">Other</option>
-              </select>
+              />
             </div>
 
             <div className="form-group">
