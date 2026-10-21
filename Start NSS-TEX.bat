@@ -13,6 +13,12 @@ if not exist "node_modules" (
   call npm install
 )
 
+:: Ensure custom app icon is configured
+if not exist "%~dp0design-assets\NSS-TEX-Logo.jpg" (
+  echo [Info] Configuring NSS-TEX ERP logo and desktop shortcut icon...
+  powershell -NoProfile -ExecutionPolicy Unrestricted -File "%~dp0scripts\generateAppIcons.ps1" >nul 2>&1
+)
+
 :: Ensure production UI build is ready
 if not exist "dist\index.html" (
   echo [Info] Building frontend user interface...

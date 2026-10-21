@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import logoImg from '../../assets/logo.png';
 import {
   LayoutDashboard,
   Boxes,
@@ -54,7 +55,16 @@ export default function Sidebar() {
       {/* Brand Header */}
       <div className="sidebar-header">
         <div className="sidebar-logo-container">
-          <img src="/logo.png" alt="NSS-TEX Logo" className="sidebar-logo-img" />
+          <img
+            src={logoImg}
+            alt="NSS-TEX Logo"
+            className="sidebar-logo-img"
+            onError={(e) => {
+              if (!e.currentTarget.src.endsWith('logo.png')) {
+                e.currentTarget.src = './logo.png';
+              }
+            }}
+          />
         </div>
         <div>
           <h1 className="sidebar-brand-title">NSS-TEX</h1>

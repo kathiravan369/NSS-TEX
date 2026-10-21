@@ -137,11 +137,25 @@ function createMenu(win) {
  * Create the main desktop application window
  */
 function createWindow() {
-  const iconPath = process.platform === 'win32'
-    ? path.join(__dirname, 'logo.ico')
-    : path.join(__dirname, 'logo.png');
+  // Look for valid icon in candidate paths (supports both .ico and .png on Windows)
+  const candidateIconPaths = [
+    path.join(__dirname, 'logo.ico'),
+    path.join(__dirname, 'logo.png'),
+    path.join(__dirname, '../public/logo.png'),
+    path.join(__dirname, '../src/assets/logo.png'),
+    path.join(__dirname, '../dist/logo.png')
+  ];
 
-  const appIcon = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : null;
+  let appIcon = null;
+  for (const candidate of candidateIconPaths) {
+    if (fs.existsSync(candidate)) {
+      const img = nativeImage.createFromPath(candidate);
+      if (!img.isEmpty()) {
+        appIcon = img;
+        break;
+      }
+    }
+  }
 
   mainWindow = new BrowserWindow({
     width: 1440,

@@ -23,6 +23,7 @@ import { ADMIN_MOBILE, generatePaymentReminderMessage, openWhatsAppChat, openEma
 import Toast from '../components/common/Toast';
 import Modal from '../components/common/Modal';
 import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
+import logoImg from '../assets/logo.png';
 
 // Number to Words converter for Indian Rupees
 function numberToWords(num) {
@@ -303,7 +304,16 @@ export default function InvoiceView() {
         <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #0f172a', paddingBottom: '1.25rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-              <img src="/logo.png" alt="NSS-TEX" style={{ width: '45px', height: '45px', objectFit: 'contain' }} />
+              <img
+                src={logoImg}
+                alt="NSS-TEX"
+                style={{ width: '45px', height: '45px', objectFit: 'contain' }}
+                onError={(e) => {
+                  if (!e.currentTarget.src.endsWith('logo.png')) {
+                    e.currentTarget.src = './logo.png';
+                  }
+                }}
+              />
               <div>
                 <h1 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: '#0d1527', letterSpacing: '-0.02em' }}>
                   NSS-TEX TOWELS & TEXTILES
