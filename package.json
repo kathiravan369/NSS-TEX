@@ -11,8 +11,7 @@
     "server": "node backend/server.js",
     "dev:backend": "node backend/server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
-    "test": "node backend/tests/apiTest.js",
-    "test:e2e": "node backend/tests/e2eQaVerification.js",
+    "db:clear": "node scripts/clearDatabase.js",
     "electron": "electron .",
     "electron:dev": "electron .",
     "start": "electron ."
