@@ -1,5 +1,6 @@
 {
   "name": "nss-towels-erp",
+  "productName": "NSS-TEX ERP",
   "version": "1.0.0",
   "private": true,
   "description": "NSS TOWELS / TexMan ERP Manufacturing Management Desktop Application",
@@ -12,9 +13,45 @@
     "dev:backend": "node backend/server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
     "db:clear": "node scripts/clearDatabase.js",
+    "desktop": "concurrently \"npm run server\" \"electron .\"",
+    "desktop:dev": "concurrently \"npm run dev\" \"npm run server\" \"electron .\"",
     "electron": "electron .",
     "electron:dev": "electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
     "start": "electron ."
+  },
+  "build": {
+    "appId": "com.nsstowels.erp",
+    "productName": "NSS-TEX ERP",
+    "copyright": "Copyright © 2026 NSS TOWELS",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "electron/logo.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NSS-TEX ERP"
+    }
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -35,6 +72,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^10.0.6",
     "electron": "^33.2.1",
+    "electron-builder": "^26.15.3",
     "vite": "^6.0.1"
   }
 }
