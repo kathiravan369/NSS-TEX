@@ -490,3 +490,138 @@ exports.getGSTSummaryReport = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Customer Reorder Reminders Report (Customers with purchases >= 30 days from bill date)
+// @route   GET /api/sales/reports/reorder-reminders
+// @access  Public
+exports.getReorderRemindersReport = async (req, res, next) => {
+  try {
+    const { minDays = 30, search = '' } = req.query;
+    const isDb = mongoose.connection.readyState === 1;
+
+    if (isDb) {
+      const sql = `
+        WITH latest_invoices AS (
+          SELECT 
+            i.customer_id,
+            i.customer_name,
+            i.customer_code,
+            i.customer_snapshot,
+            i.invoice_no as last_invoice_no,
+            i.invoice_date as last_invoice_date,
+            i.grand_total as last_grand_total,
+            i.items as last_items,
+            CURRENT_DATE - i.invoice_date as days_since_bill,
+            ROW_NUMBER() OVER (PARTITION BY i.customer_id, i.customer_name ORDER BY i.invoice_date DESC, i.id DESC) as rn
+          FROM invoices i
+          WHERE i.invoice_status != 'Cancelled'
+        ),
+        customer_stats AS (
+          SELECT
+            customer_id,
+            customer_name,
+            COUNT(*) as total_orders,
+            COALESCE(SUM(grand_total), 0) as lifetime_sales
+          FROM invoices
+          WHERE invoice_status != 'Cancelled'
+          GROUP BY customer_id, customer_name
+        )
+        SELECT 
+          li.customer_id as "customerId",
+          COALESCE(c.name, li.customer_name, 'Unknown Customer') as "customerName",
+          COALESCE(c.customer_id, li.customer_code, '') as "customerCode",
+          COALESCE(c.phone, li.customer_snapshot->>'phone', '') as "phone",
+          COALESCE(c.email, li.customer_snapshot->>'email', '') as "email",
+          COALESCE(c.company_name, li.customer_snapshot->>'companyName', '') as "companyName",
+          COALESCE(c.billing_address->>'city', li.customer_snapshot->'billingAddress'->>'city', '') as "city",
+          li.last_invoice_no as "lastInvoiceNo",
+          li.last_invoice_date as "lastInvoiceDate",
+          li.last_grand_total as "lastBillAmount",
+          li.last_items as "lastItems",
+          li.days_since_bill as "daysSinceBill",
+          COALESCE(cs.total_orders, 1) as "totalOrders",
+          COALESCE(cs.lifetime_sales, li.last_grand_total) as "lifetimeSales"
+        FROM latest_invoices li
+        LEFT JOIN customers c ON c.id = li.customer_id
+        LEFT JOIN customer_stats cs ON cs.customer_id = li.customer_id AND (cs.customer_name = li.customer_name OR cs.customer_name IS NULL)
+        WHERE li.rn = 1 AND li.days_since_bill >= $1
+        ORDER BY li.days_since_bill DESC
+      `;
+
+      const result = await query(sql, [Number(minDays) || 30]);
+      let rows = result.rows;
+
+      if (search && search.trim()) {
+        const s = search.toLowerCase().trim();
+        rows = rows.filter(r => 
+          (r.customerName && r.customerName.toLowerCase().includes(s)) ||
+          (r.phone && r.phone.includes(s)) ||
+          (r.lastInvoiceNo && r.lastInvoiceNo.toLowerCase().includes(s))
+        );
+      }
+
+      return res.json({
+        success: true,
+        count: rows.length,
+        data: rows
+      });
+    }
+
+    // Fallback using runtimeStore
+    const now = new Date();
+    const customerMap = new Map();
+
+    (runtimeStore.invoices || [])
+      .filter(i => i.invoiceStatus !== 'Cancelled')
+      .forEach(inv => {
+        const key = inv.customerId || inv.customerName;
+        if (!key) return;
+
+        const invDate = new Date(inv.invoiceDate);
+        const existing = customerMap.get(key);
+
+        if (!existing || new Date(existing.lastInvoiceDate) < invDate) {
+          customerMap.set(key, {
+            customerId: inv.customerId,
+            customerName: inv.customerName,
+            customerCode: inv.customerCode,
+            phone: inv.customerSnapshot?.phone || '',
+            email: inv.customerSnapshot?.email || '',
+            companyName: inv.customerSnapshot?.companyName || '',
+            city: inv.customerSnapshot?.billingAddress?.city || '',
+            lastInvoiceNo: inv.invoiceNo,
+            lastInvoiceDate: inv.invoiceDate,
+            lastBillAmount: inv.grandTotal,
+            lastItems: inv.items,
+            daysSinceBill: Math.floor((now - invDate) / (1000 * 60 * 60 * 24)),
+            totalOrders: (existing?.totalOrders || 0) + 1,
+            lifetimeSales: (existing?.lifetimeSales || 0) + Number(inv.grandTotal || 0)
+          });
+        } else {
+          existing.totalOrders += 1;
+          existing.lifetimeSales += Number(inv.grandTotal || 0);
+        }
+      });
+
+    let list = Array.from(customerMap.values())
+      .filter(c => c.daysSinceBill >= (Number(minDays) || 30))
+      .sort((a, b) => b.daysSinceBill - a.daysSinceBill);
+
+    if (search && search.trim()) {
+      const s = search.toLowerCase().trim();
+      list = list.filter(r => 
+        (r.customerName && r.customerName.toLowerCase().includes(s)) ||
+        (r.phone && r.phone.includes(s)) ||
+        (r.lastInvoiceNo && r.lastInvoiceNo.toLowerCase().includes(s))
+      );
+    }
+
+    res.json({
+      success: true,
+      count: list.length,
+      data: list
+    });
+  } catch (error) {
+    next(error);
+  }
+};

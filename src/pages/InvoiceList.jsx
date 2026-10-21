@@ -18,7 +18,13 @@ import {
   DollarSign,
   TrendingUp,
   Send,
-  Calendar
+  Calendar,
+  MessageCircle,
+  Mail,
+  Copy,
+  ExternalLink,
+  Bell,
+  PhoneCall
 } from 'lucide-react';
 import DataTable from '../components/common/DataTable';
 import MetricCard from '../components/common/MetricCard';
@@ -29,7 +35,8 @@ import DateRangePicker from '../components/common/DateRangePicker';
 import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
 import { storageService } from '../services/storageService';
 import { api } from '../services/api';
-import { formatINR, formatDate } from '../utils/formatters';
+import { formatINR, formatDate, getInvoiceDueDate, isInvoiceOverdue, getInvoiceDueStatus } from '../utils/formatters';
+import { ADMIN_MOBILE, generatePaymentReminderMessage, openWhatsAppChat, openEmailClient } from '../utils/reminderMessages';
 
 export default function InvoiceList() {
   const navigate = useNavigate();
@@ -38,7 +45,8 @@ export default function InvoiceList() {
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
-  // Filters
+  // Filters & Tabs
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'due', 'overdue', 'paid'
   const [searchQuery, setSearchQuery] = useState('');
   const [customerFilter, setCustomerFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -56,6 +64,12 @@ export default function InvoiceList() {
   const [paymentRef, setPaymentRef] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
 
+  // Payment Reminder Modal State
+  const [reminderInvoice, setReminderInvoice] = useState(null);
+  const [reminderPhone, setReminderPhone] = useState('');
+  const [reminderEmail, setReminderEmail] = useState('');
+  const [reminderMessage, setReminderMessage] = useState('');
+
   // Delete Confirm
   const [deletingInvoice, setDeletingInvoice] = useState(null);
 
@@ -63,6 +77,17 @@ export default function InvoiceList() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  // Support URL query param ?tab=due or ?tab=overdue
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && ['all', 'due', 'overdue', 'paid'].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    } catch (e) {}
+  }, []);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -92,15 +117,21 @@ export default function InvoiceList() {
     const totalSales = invoices.reduce((sum, i) => sum + (Number(i.grandTotal) || 0), 0);
     const amountReceived = invoices.reduce((sum, i) => sum + (Number(i.amountPaid) || 0), 0);
     const outstanding = invoices.reduce((sum, i) => sum + (Number(i.balanceDue) || 0), 0);
-    const paidCount = invoices.filter(i => i.paymentStatus === 'Paid').length;
-    const pendingCount = invoices.filter(i => i.paymentStatus !== 'Paid').length;
+    const paidCount = invoices.filter(i => i.paymentStatus === 'Paid' || Number(i.balanceDue) <= 0).length;
+    const dueCount = invoices.filter(i => Number(i.balanceDue) > 0).length;
+    const overdueCount = invoices.filter(i => isInvoiceOverdue(i)).length;
 
-    return { totalCount, totalSales, amountReceived, outstanding, paidCount, pendingCount };
+    return { totalCount, totalSales, amountReceived, outstanding, paidCount, dueCount, overdueCount };
   }, [invoices]);
 
-  // Filtered Invoices
+  // Filtered Invoices (including Tab filtering)
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
+      // Tab based filter
+      if (activeTab === 'due' && Number(inv.balanceDue) <= 0) return false;
+      if (activeTab === 'overdue' && !isInvoiceOverdue(inv)) return false;
+      if (activeTab === 'paid' && (inv.paymentStatus !== 'Paid' && Number(inv.balanceDue) > 0)) return false;
+
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         q === '' ||
@@ -132,7 +163,7 @@ export default function InvoiceList() {
 
       return matchesSearch && matchesCustomer && matchesStatus && matchesPayment && matchesDate;
     });
-  }, [invoices, searchQuery, customerFilter, statusFilter, paymentStatusFilter, startDate, endDate]);
+  }, [invoices, activeTab, searchQuery, customerFilter, statusFilter, paymentStatusFilter, startDate, endDate]);
 
   const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage) || 1;
   const paginatedInvoices = filteredInvoices.slice(
@@ -198,6 +229,43 @@ export default function InvoiceList() {
     }
   };
 
+  const handleOpenReminderModal = (inv) => {
+    setReminderInvoice(inv);
+    const fullCust = customers.find(c => String(c.id || c._id || c.customerId) === String(inv.customerId)) || {};
+    const phone = inv.customerSnapshot?.phone || fullCust.phone || '';
+    const email = inv.customerSnapshot?.email || fullCust.email || '';
+    setReminderPhone(phone);
+    setReminderEmail(email);
+    setReminderMessage(generatePaymentReminderMessage(inv));
+  };
+
+  const handleSendWhatsAppReminder = () => {
+    if (!reminderPhone) {
+      showToast('Please provide a customer mobile number.', 'error');
+      return;
+    }
+    openWhatsAppChat(reminderPhone, reminderMessage);
+    showToast(`Opening WhatsApp chat to +91 ${reminderPhone}`);
+  };
+
+  const handleSendEmailReminder = () => {
+    if (!reminderEmail) {
+      showToast('Please provide a customer email address.', 'error');
+      return;
+    }
+    openEmailClient(
+      reminderEmail,
+      `Payment Reminder: Invoice ${reminderInvoice?.invoiceNo || ''} — NSS-TEX`,
+      reminderMessage
+    );
+    showToast(`Opening email client for ${reminderEmail}`);
+  };
+
+  const handleCopyReminderMessage = () => {
+    navigator.clipboard.writeText(reminderMessage);
+    showToast('Reminder message copied to clipboard!');
+  };
+
   const handleExportCSV = () => {
     storageService.exportToCSV('Invoices_Report', filteredInvoices, columns);
     showToast('Exported Invoices list to Excel.');
@@ -233,6 +301,49 @@ export default function InvoiceList() {
       header: 'Date',
       width: '95px',
       render: (val) => formatDate(val)
+    },
+    {
+      key: 'dueDate',
+      header: 'Due Date',
+      width: '120px',
+      render: (val, row) => {
+        const dueStr = getInvoiceDueDate(row);
+        const statusInfo = getInvoiceDueStatus(row);
+        let badgeBg = '#f1f5f9';
+        let badgeColor = '#475569';
+        if (statusInfo.status === 'overdue') {
+          badgeBg = '#fee2e2';
+          badgeColor = '#b91c1c';
+        } else if (statusInfo.status === 'today') {
+          badgeBg = '#fef3c7';
+          badgeColor = '#b45309';
+        } else if (statusInfo.status === 'paid') {
+          badgeBg = '#dcfce7';
+          badgeColor = '#15803d';
+        }
+
+        return (
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: statusInfo.status === 'overdue' ? '#dc2626' : 'var(--text-main)' }}>
+              {formatDate(dueStr)}
+            </div>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                padding: '1px 6px',
+                borderRadius: '4px',
+                backgroundColor: badgeBg,
+                color: badgeColor,
+                fontWeight: 600,
+                display: 'inline-block',
+                marginTop: '2px'
+              }}
+            >
+              {statusInfo.label}
+            </span>
+          </div>
+        );
+      }
     },
     {
       key: 'customerName',
@@ -338,6 +449,64 @@ export default function InvoiceList() {
           {val || 'Draft'}
         </span>
       )
+    },
+    {
+      key: 'reminderActions',
+      header: 'Remind',
+      width: '115px',
+      render: (val, row) => {
+        const hasDue = Number(row.balanceDue) > 0;
+        if (!hasDue) {
+          return (
+            <span style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+              <CheckCircle size={13} /> Paid
+            </span>
+          );
+        }
+
+        return (
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{
+                backgroundColor: '#25D366',
+                color: '#ffffff',
+                border: 'none',
+                padding: '3px 7px',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}
+              title="Quick Send WhatsApp Payment Reminder"
+              onClick={(e) => {
+                e.stopPropagation();
+                const fullCust = customers.find(c => String(c.id || c._id || c.customerId) === String(row.customerId)) || {};
+                const phone = row.customerSnapshot?.phone || fullCust.phone || '';
+                const msg = generatePaymentReminderMessage(row);
+                openWhatsAppChat(phone, msg);
+                showToast(`Opening WhatsApp chat for ${row.customerName}`);
+              }}
+            >
+              <MessageCircle size={12} /> WhatsApp
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ padding: '3px 6px' }}
+              title="Preview / Customize Payment Reminder (Email & WhatsApp)"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenReminderModal(row);
+              }}
+            >
+              <Send size={12} />
+            </button>
+          </div>
+        );
+      }
     }
   ];
 
@@ -405,6 +574,157 @@ export default function InvoiceList() {
           iconColor="#7c3aed"
         />
       </div>
+
+      {/* Tabs Navigation */}
+      <div style={{ display: 'flex', gap: '0.35rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px', overflowX: 'auto' }}>
+        <button
+          type="button"
+          onClick={() => { setActiveTab('all'); setPage(1); }}
+          style={{
+            padding: '0.55rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'all' ? '3px solid var(--primary-600)' : '3px solid transparent',
+            color: activeTab === 'all' ? 'var(--primary-600)' : 'var(--text-muted)',
+            fontWeight: activeTab === 'all' ? 700 : 500,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <Receipt size={15} /> All Invoices ({summaryMetrics.totalCount})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setActiveTab('due'); setPage(1); }}
+          style={{
+            padding: '0.55rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'due' ? '3px solid #d97706' : '3px solid transparent',
+            color: activeTab === 'due' ? '#d97706' : 'var(--text-muted)',
+            fontWeight: activeTab === 'due' ? 700 : 500,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <Clock size={15} /> Payment Due
+          {summaryMetrics.dueCount > 0 && (
+            <span
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                backgroundColor: '#f59e0b',
+                color: '#ffffff',
+                padding: '1px 7px',
+                borderRadius: '9999px',
+                marginLeft: '4px'
+              }}
+            >
+              {summaryMetrics.dueCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setActiveTab('overdue'); setPage(1); }}
+          style={{
+            padding: '0.55rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'overdue' ? '3px solid #dc2626' : '3px solid transparent',
+            color: activeTab === 'overdue' ? '#dc2626' : 'var(--text-muted)',
+            fontWeight: activeTab === 'overdue' ? 700 : 500,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <AlertCircle size={15} /> Overdue Invoices
+          {summaryMetrics.overdueCount > 0 && (
+            <span
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                backgroundColor: '#dc2626',
+                color: '#ffffff',
+                padding: '1px 7px',
+                borderRadius: '9999px',
+                marginLeft: '4px'
+              }}
+            >
+              {summaryMetrics.overdueCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setActiveTab('paid'); setPage(1); }}
+          style={{
+            padding: '0.55rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'paid' ? '3px solid #059669' : '3px solid transparent',
+            color: activeTab === 'paid' ? '#059669' : 'var(--text-muted)',
+            fontWeight: activeTab === 'paid' ? 700 : 500,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <CheckCircle size={15} /> Fully Paid ({summaryMetrics.paidCount})
+        </button>
+      </div>
+
+      {/* Due / Overdue Notice Banner */}
+      {(activeTab === 'due' || activeTab === 'overdue') && (
+        <div
+          style={{
+            backgroundColor: activeTab === 'overdue' ? '#fff1f2' : '#fffbeb',
+            border: `1px solid ${activeTab === 'overdue' ? '#fecdd3' : '#fde68a'}`,
+            borderRadius: 'var(--radius-md)',
+            padding: '0.85rem 1.15rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ color: activeTab === 'overdue' ? '#e11d48' : '#d97706' }}>
+              {activeTab === 'overdue' ? <AlertCircle size={20} /> : <Clock size={20} />}
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.875rem', color: activeTab === 'overdue' ? '#9f1239' : '#92400e' }}>
+                {activeTab === 'overdue' ? 'Overdue Invoices Requiring Urgent Settlement' : 'Payment Due Invoices'}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: activeTab === 'overdue' ? '#be123c' : '#b45309' }}>
+                Send polite payment request messages directly from Admin Mobile (+91 {ADMIN_MOBILE}) to customer mobiles via WhatsApp & Email.
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: activeTab === 'overdue' ? '#be123c' : '#92400e' }}>
+            Outstanding Balance: {formatINR(filteredInvoices.reduce((sum, i) => sum + (Number(i.balanceDue) || 0), 0))}
+          </div>
+        </div>
+      )}
 
       {/* Filters Toolbar */}
       <div className="erp-card" style={{ padding: '0.85rem 1.15rem' }}>
@@ -631,6 +951,148 @@ export default function InvoiceList() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Payment Reminder Modal */}
+      {reminderInvoice && (
+        <Modal
+          isOpen={!!reminderInvoice}
+          onClose={() => setReminderInvoice(null)}
+          title={`Payment Reminder — ${reminderInvoice.invoiceNo}`}
+          maxWidth="680px"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Sender Notice */}
+            <div
+              style={{
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px',
+                padding: '0.75rem 1rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '0.82rem'
+              }}
+            >
+              <div>
+                <span style={{ color: '#1e40af', fontWeight: 600 }}>Sender (Admin Mobile):</span>{' '}
+                <strong style={{ color: '#1e3a8a' }}>+91 {ADMIN_MOBILE}</strong> (NSS-TEX Admin)
+              </div>
+              <span style={{ fontSize: '0.72rem', backgroundColor: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                WhatsApp Direct Link
+              </span>
+            </div>
+
+            {/* Recipient Details */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="form-group">
+                <label className="form-label">Customer Mobile Number</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g. 9844953791"
+                  value={reminderPhone}
+                  onChange={(e) => setReminderPhone(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Customer Email</label>
+                <input
+                  type="email"
+                  className="form-control"
+                  placeholder="e.g. customer@example.com"
+                  value={reminderEmail}
+                  onChange={(e) => setReminderEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Invoice Summary Card */}
+            <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '6px', fontSize: '0.8rem', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Customer:</span>
+                <strong>{reminderInvoice.customerName}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Invoice Total:</span>
+                <span>{formatINR(reminderInvoice.grandTotal)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Due Date:</span>
+                <strong style={{ color: isInvoiceOverdue(reminderInvoice) ? '#dc2626' : 'var(--text-main)' }}>
+                  {formatDate(reminderInvoice.dueDate)}
+                  {isInvoiceOverdue(reminderInvoice) && ' (Overdue)'}
+                </strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px dashed #cbd5e1' }}>
+                <span style={{ fontWeight: 600 }}>Outstanding Balance Due:</span>
+                <strong style={{ color: '#dc2626', fontSize: '0.9rem' }}>{formatINR(reminderInvoice.balanceDue)}</strong>
+              </div>
+            </div>
+
+            {/* Message Preview / Textarea */}
+            <div className="form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label className="form-label" style={{ margin: 0 }}>Payment Request Message</label>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                  onClick={handleCopyReminderMessage}
+                >
+                  <Copy size={12} /> Copy Message
+                </button>
+              </div>
+              <textarea
+                className="form-control"
+                rows={9}
+                style={{ fontSize: '0.8rem', fontFamily: 'monospace', lineHeight: 1.45 }}
+                value={reminderMessage}
+                onChange={(e) => setReminderMessage(e.target.value)}
+              />
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setReminderInvoice(null)}
+              >
+                Close
+              </button>
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                {reminderEmail && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleSendEmailReminder}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
+                  >
+                    <Mail size={14} /> Send Email
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn"
+                  style={{
+                    backgroundColor: '#25D366',
+                    color: '#ffffff',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontWeight: 600
+                  }}
+                  onClick={handleSendWhatsAppReminder}
+                >
+                  <MessageCircle size={16} /> Send via WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
         </Modal>
       )}
 

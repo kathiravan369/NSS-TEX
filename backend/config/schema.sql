@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS thread_purchases (
   invoice_no VARCHAR(100) DEFAULT '',
   status VARCHAR(30) DEFAULT 'Paid',
   notes TEXT DEFAULT '',
+  items JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

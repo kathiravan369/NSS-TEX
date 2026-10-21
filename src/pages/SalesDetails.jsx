@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   BarChart3,
   TrendingUp,
@@ -21,7 +21,15 @@ import {
   DollarSign,
   AlertTriangle,
   Receipt,
-  FileText
+  FileText,
+  MessageCircle,
+  Mail,
+  Copy,
+  ExternalLink,
+  PhoneCall,
+  ShoppingBag,
+  Send,
+  Plus
 } from 'lucide-react';
 import MetricCard from '../components/common/MetricCard';
 import DataTable from '../components/common/DataTable';
@@ -32,7 +40,8 @@ import DateRangePicker from '../components/common/DateRangePicker';
 import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
 import { storageService } from '../services/storageService';
 import { api } from '../services/api';
-import { formatINR, formatDate } from '../utils/formatters';
+import { formatINR, formatDate, getDaysSinceDate } from '../utils/formatters';
+import { ADMIN_MOBILE, generateReorderReminderMessage, openWhatsAppChat, openEmailClient } from '../utils/reminderMessages';
 
 export default function SalesDetails() {
   const navigate = useNavigate();
@@ -62,6 +71,16 @@ export default function SalesDetails() {
   const [periodicData, setPeriodicData] = useState([]);
   const [outstandingData, setOutstandingData] = useState([]);
   const [gstSummary, setGstSummary] = useState(null);
+
+  // Reorder reminders states
+  const [reorderTimeFilter, setReorderTimeFilter] = useState('all');
+  const [reorderSearchQuery, setReorderSearchQuery] = useState('');
+  const [reorderModalCustomer, setReorderModalCustomer] = useState(null);
+  const [reorderModalPhone, setReorderModalPhone] = useState('');
+  const [reorderModalEmail, setReorderModalEmail] = useState('');
+  const [reorderCustomMessage, setReorderCustomMessage] = useState('');
+  const [reorderPage, setReorderPage] = useState(1);
+  const [reorderItemsPerPage, setReorderItemsPerPage] = useState(10);
 
   // Payment Modal
   const [paymentInvoice, setPaymentInvoice] = useState(null);
@@ -123,6 +142,141 @@ export default function SalesDetails() {
   useEffect(() => {
     loadData();
   }, [startDate, endDate, customerFilter, statusFilter, paymentStatusFilter, periodGranularity]);
+
+  // Handle URL query parameter ?tab=reorder
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam === 'reorder' || tabParam === 'rebuy') {
+        setActiveTab('reorder');
+      }
+    } catch (e) {
+      // Ignore URL parse error
+    }
+  }, []);
+
+  // Compute customers whose latest purchase was >= 30 days ago from bill date
+  const reorderCustomers = useMemo(() => {
+    const now = new Date();
+    const custMap = new Map();
+
+    const customerDirectory = new Map();
+    customers.forEach(c => {
+      const key = String(c.id || c._id || c.customerId);
+      customerDirectory.set(key, c);
+      if (c.name) customerDirectory.set(c.name.toLowerCase().trim(), c);
+    });
+
+    invoices.forEach(inv => {
+      if (inv.invoiceStatus === 'Cancelled') return;
+      const key = String(inv.customerId || inv.customerName);
+      if (!key) return;
+
+      const invDate = new Date(inv.invoiceDate);
+      if (isNaN(invDate.getTime())) return;
+
+      const existing = custMap.get(key);
+      if (!existing || new Date(existing.lastInvoiceDate) < invDate) {
+        const fullCust = customerDirectory.get(String(inv.customerId)) || customerDirectory.get((inv.customerName || '').toLowerCase().trim()) || {};
+        const phone = fullCust.phone || inv.customerSnapshot?.phone || '';
+        const email = fullCust.email || inv.customerSnapshot?.email || '';
+        const companyName = fullCust.companyName || inv.customerSnapshot?.companyName || '';
+        const city = fullCust.billingAddress?.city || inv.customerSnapshot?.billingAddress?.city || '';
+
+        custMap.set(key, {
+          customerId: inv.customerId,
+          customerName: inv.customerName || fullCust.name || 'Unknown Customer',
+          customerCode: inv.customerCode || fullCust.customerId || '',
+          phone,
+          email,
+          companyName,
+          city,
+          lastInvoiceId: inv._id || inv.id,
+          lastInvoiceNo: inv.invoiceNo,
+          lastInvoiceDate: inv.invoiceDate,
+          lastBillAmount: Number(inv.grandTotal) || 0,
+          lastItems: Array.isArray(inv.items) ? inv.items : [],
+          daysSinceBill: Math.floor((now - invDate) / (1000 * 60 * 60 * 24)),
+          totalOrders: (existing?.totalOrders || 0) + 1,
+          lifetimeSales: (existing?.lifetimeSales || 0) + (Number(inv.grandTotal) || 0)
+        });
+      } else {
+        existing.totalOrders += 1;
+        existing.lifetimeSales += (Number(inv.grandTotal) || 0);
+      }
+    });
+
+    return Array.from(custMap.values())
+      .filter(c => c.daysSinceBill >= 30)
+      .sort((a, b) => b.daysSinceBill - a.daysSinceBill);
+  }, [invoices, customers]);
+
+  // Filtered list for Reorder Reminders Tab
+  const filteredReorderCustomers = useMemo(() => {
+    return reorderCustomers.filter(c => {
+      const q = reorderSearchQuery.toLowerCase().trim();
+      const matchesSearch = !q ||
+        (c.customerName && c.customerName.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.includes(q)) ||
+        (c.city && c.city.toLowerCase().includes(q)) ||
+        (c.lastInvoiceNo && c.lastInvoiceNo.toLowerCase().includes(q)) ||
+        (c.lastItems && c.lastItems.some(it => (it.productName || it.name || '').toLowerCase().includes(q)));
+
+      let matchesTime = true;
+      if (reorderTimeFilter === '30-45') {
+        matchesTime = c.daysSinceBill >= 30 && c.daysSinceBill <= 45;
+      } else if (reorderTimeFilter === '46-60') {
+        matchesTime = c.daysSinceBill > 45 && c.daysSinceBill <= 60;
+      } else if (reorderTimeFilter === '60+') {
+        matchesTime = c.daysSinceBill > 60;
+      }
+
+      return matchesSearch && matchesTime;
+    });
+  }, [reorderCustomers, reorderSearchQuery, reorderTimeFilter]);
+
+  const paginatedReorderCustomers = useMemo(() => {
+    const start = (reorderPage - 1) * reorderItemsPerPage;
+    return filteredReorderCustomers.slice(start, start + reorderItemsPerPage);
+  }, [filteredReorderCustomers, reorderPage, reorderItemsPerPage]);
+
+  const totalReorderPages = Math.ceil(filteredReorderCustomers.length / reorderItemsPerPage) || 1;
+
+  const handleOpenReorderModal = (cust) => {
+    setReorderModalCustomer(cust);
+    setReorderModalPhone(cust.phone || '');
+    setReorderModalEmail(cust.email || '');
+    const msg = generateReorderReminderMessage(cust, {
+      invoiceNo: cust.lastInvoiceNo,
+      invoiceDate: cust.lastInvoiceDate,
+      items: cust.lastItems
+    });
+    setReorderCustomMessage(msg);
+  };
+
+  const handleSendReorderWhatsApp = () => {
+    if (!reorderModalPhone) {
+      showToast('Please provide a customer mobile number.', 'error');
+      return;
+    }
+    openWhatsAppChat(reorderModalPhone, reorderCustomMessage);
+    showToast(`Opening WhatsApp chat with +91 ${reorderModalPhone}`);
+  };
+
+  const handleSendReorderEmail = () => {
+    if (!reorderModalEmail) {
+      showToast('Please provide a customer email address.', 'error');
+      return;
+    }
+    openEmailClient(reorderModalEmail, `Reorder & Restock Reminder — NSS-TEX`, reorderCustomMessage);
+    showToast(`Opening email client for ${reorderModalEmail}`);
+  };
+
+  const handleCopyReorderMessage = () => {
+    navigator.clipboard.writeText(reorderCustomMessage);
+    showToast('Reminder message copied to clipboard!');
+  };
 
   // Filtered Invoices for Transactions Table
   const filteredInvoices = useMemo(() => {
@@ -646,6 +800,42 @@ export default function SalesDetails() {
         >
           <FileText size={15} /> GST Summary
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('reorder')}
+          style={{
+            padding: '0.55rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'reorder' ? '3px solid #d97706' : '3px solid transparent',
+            color: activeTab === 'reorder' ? '#d97706' : 'var(--text-muted)',
+            fontWeight: activeTab === 'reorder' ? 700 : 500,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <RotateCcw size={15} /> Reorder Reminders (30+ Days)
+          {reorderCustomers.length > 0 && (
+            <span
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                backgroundColor: '#f59e0b',
+                color: '#ffffff',
+                padding: '1px 7px',
+                borderRadius: '9999px',
+                marginLeft: '4px'
+              }}
+            >
+              {reorderCustomers.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Tab 1: All Invoices Transaction Table */}
@@ -986,6 +1176,386 @@ export default function SalesDetails() {
         </div>
       )}
 
+      {/* Tab 7: Reorder Reminders (30+ Days from Bill Date) */}
+      {activeTab === 'reorder' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Informational Banner */}
+          <div
+            style={{
+              backgroundColor: '#fffbeb',
+              border: '1px solid #fde68a',
+              borderRadius: 'var(--radius-md)',
+              padding: '1.15rem 1.35rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem' }}>
+              <div style={{ backgroundColor: '#fef3c7', padding: '0.6rem', borderRadius: '50%', color: '#b45309' }}>
+                <RotateCcw size={22} />
+              </div>
+              <div>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '0.98rem', fontWeight: 700, color: '#92400e' }}>
+                  Customer Reorder Reminders (30+ Days from Bill Date)
+                </h4>
+                <p style={{ margin: 0, fontSize: '0.825rem', color: '#b45309', maxWidth: '780px', lineHeight: 1.55 }}>
+                  When customers buy goods from us, we track the elapsed time from their bill date. Customers listed below made purchases <strong>30 or more days ago</strong> and are due for follow-up to rebuy our towels and textile goods. Reach out via WhatsApp or phone from Admin Mobile <strong>(+91 {ADMIN_MOBILE})</strong>.
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => storageService.exportToCSV('Reorder_Reminders_30Days', filteredReorderCustomers, [
+                  { header: 'Customer Name', key: 'customerName' },
+                  { header: 'Phone', key: 'phone' },
+                  { header: 'City', key: 'city' },
+                  { header: 'Last Bill Date', key: 'lastInvoiceDate', render: (val) => formatDate(val) },
+                  { header: 'Last Invoice No', key: 'lastInvoiceNo' },
+                  { header: 'Days Since Bill', key: 'daysSinceBill' },
+                  { header: 'Last Bill Amount', key: 'lastBillAmount', render: (val) => formatINR(val) }
+                ])}
+              >
+                <Download size={14} /> Export List
+              </button>
+            </div>
+          </div>
+
+          {/* KPI Summary Cards */}
+          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <MetricCard
+              title="Customers to Re-engage"
+              value={reorderCustomers.length}
+              trend="30+ days since purchase"
+              trendType="up"
+              icon={Users}
+              iconBg="#eff6ff"
+              iconColor="#2563eb"
+            />
+            <MetricCard
+              title="Past Orders Total"
+              value={formatINR(reorderCustomers.reduce((sum, c) => sum + (c.lastBillAmount || 0), 0))}
+              trend="Last purchase value"
+              trendType="up"
+              icon={DollarSign}
+              iconBg="#ecfdf5"
+              iconColor="#059669"
+            />
+            <MetricCard
+              title="Average Order Age"
+              value={`${Math.round(reorderCustomers.reduce((sum, c) => sum + c.daysSinceBill, 0) / (reorderCustomers.length || 1))} Days`}
+              trend="Since bill date"
+              trendType="down"
+              icon={Clock}
+              iconBg="#fef3c7"
+              iconColor="#d97706"
+            />
+            <MetricCard
+              title="Lifetime Sales Volume"
+              value={formatINR(reorderCustomers.reduce((sum, c) => sum + (c.lifetimeSales || 0), 0))}
+              trend="All previous invoices"
+              trendType="up"
+              icon={TrendingUp}
+              iconBg="#f5f3ff"
+              iconColor="#7c3aed"
+            />
+          </div>
+
+          {/* Search & Filter Toolbar */}
+          <div className="erp-card" style={{ padding: '0.85rem 1.15rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div className="search-box" style={{ flex: 1, minWidth: '220px', height: '36px' }}>
+                <Search size={14} color="var(--text-muted)" />
+                <input
+                  type="text"
+                  placeholder="Search customer name, phone, invoice no, product..."
+                  value={reorderSearchQuery}
+                  onChange={(e) => {
+                    setReorderSearchQuery(e.target.value);
+                    setReorderPage(1);
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Filter Age:</span>
+                <select
+                  className="form-control"
+                  style={{ width: '180px', height: '36px', fontSize: '0.8125rem' }}
+                  value={reorderTimeFilter}
+                  onChange={(e) => {
+                    setReorderTimeFilter(e.target.value);
+                    setReorderPage(1);
+                  }}
+                >
+                  <option value="all">All (30+ Days)</option>
+                  <option value="30-45">30 to 45 Days</option>
+                  <option value="46-60">46 to 60 Days</option>
+                  <option value="60+">60+ Days (High Urgency)</option>
+                </select>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ height: '36px' }}
+                onClick={() => {
+                  setReorderSearchQuery('');
+                  setReorderTimeFilter('all');
+                  setReorderPage(1);
+                }}
+              >
+                <RotateCcw size={14} /> Reset
+              </button>
+            </div>
+          </div>
+
+          {/* Table Container */}
+          <div className="erp-card" style={{ padding: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>
+                  Customer Reorder Pipeline ({filteredReorderCustomers.length})
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Showing customer names whose bill date was 30+ days ago for repeat order reminders
+                </span>
+              </div>
+            </div>
+
+            <div className="table-responsive">
+              <table className="erp-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '45px' }}>#</th>
+                    <th>Customer Name</th>
+                    <th>Contact Details</th>
+                    <th>Last Bill Date</th>
+                    <th>Last Invoice No.</th>
+                    <th style={{ textAlign: 'center' }}>Days Since Bill</th>
+                    <th>Items Purchased Previously</th>
+                    <th style={{ textAlign: 'right' }}>Last Bill Value</th>
+                    <th style={{ textAlign: 'center', width: '220px' }}>Rebuy Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedReorderCustomers.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                        <CheckCircle2 size={32} color="#16a34a" style={{ margin: '0 auto 0.5rem' }} />
+                        <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>No Customers Pending Reorder Follow-Up</div>
+                        <div style={{ fontSize: '0.78rem', marginTop: '4px' }}>
+                          All customers have purchased within the last 30 days, or match no current search criteria.
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedReorderCustomers.map((cust, idx) => {
+                      const sNo = (reorderPage - 1) * reorderItemsPerPage + idx + 1;
+                      let badgeBg = '#fef3c7';
+                      let badgeText = '#b45309';
+                      let urgencyLabel = 'Reorder Due';
+                      if (cust.daysSinceBill > 60) {
+                        badgeBg = '#fee2e2';
+                        badgeText = '#b91c1c';
+                        urgencyLabel = '60+ Days Inactive';
+                      } else if (cust.daysSinceBill > 45) {
+                        badgeBg = '#ffedd5';
+                        badgeText = '#c2410c';
+                        urgencyLabel = 'Restock Needed';
+                      }
+
+                      return (
+                        <tr key={cust.customerId || cust.customerName || idx}>
+                          <td>{sNo}</td>
+                          <td>
+                            <strong style={{ color: 'var(--text-main)', fontSize: '0.88rem' }}>{cust.customerName}</strong>
+                            {cust.companyName && (
+                              <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>{cust.companyName}</div>
+                            )}
+                            <div style={{ display: 'flex', gap: '4px', marginTop: '3px' }}>
+                              {cust.customerCode && (
+                                <span style={{ fontSize: '0.68rem', backgroundColor: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>
+                                  ID: {cust.customerCode}
+                                </span>
+                              )}
+                              {cust.city && (
+                                <span style={{ fontSize: '0.68rem', backgroundColor: '#eff6ff', color: '#1e40af', padding: '1px 5px', borderRadius: '4px' }}>
+                                  {cust.city}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            {cust.phone ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <a
+                                  href={`tel:${cust.phone}`}
+                                  style={{ fontWeight: 600, color: 'var(--primary-600)', textDecoration: 'none' }}
+                                  title="Click to call customer"
+                                >
+                                  {cust.phone}
+                                </a>
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No phone saved</span>
+                            )}
+                            {cust.email && (
+                              <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                {cust.email}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <strong>{formatDate(cust.lastInvoiceDate)}</strong>
+                          </td>
+                          <td>
+                            <span
+                              style={{ fontWeight: 700, color: 'var(--primary-600)', cursor: 'pointer' }}
+                              onClick={() => navigate(`/sales/invoices/${cust.lastInvoiceId}`)}
+                              title="Click to view tax invoice"
+                            >
+                              {cust.lastInvoiceNo}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <div
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '12px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                backgroundColor: badgeBg,
+                                color: badgeText,
+                                display: 'inline-block'
+                              }}
+                            >
+                              {cust.daysSinceBill} days ago
+                            </div>
+                            <div style={{ fontSize: '0.68rem', color: badgeText, marginTop: '2px', fontWeight: 500 }}>
+                              {urgencyLabel}
+                            </div>
+                          </td>
+                          <td style={{ maxWidth: '240px' }}>
+                            {cust.lastItems && cust.lastItems.length > 0 ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                {cust.lastItems.slice(0, 2).map((it, iIdx) => (
+                                  <div key={iIdx} style={{ fontSize: '0.75rem', color: '#334155' }}>
+                                    • <strong>{it.productName || it.name}</strong> ({it.quantity || it.qty || 1} {it.unit || 'Pcs'})
+                                  </div>
+                                ))}
+                                {cust.lastItems.length > 2 && (
+                                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                                    +{cust.lastItems.length - 2} more item(s)
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Standard Towels & Textiles</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                            {formatINR(cust.lastBillAmount)}
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                              {cust.totalOrders} order(s) total
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                              {/* Direct WhatsApp Button */}
+                              <button
+                                type="button"
+                                className="btn btn-sm"
+                                style={{
+                                  backgroundColor: '#25D366',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  padding: '4px 8px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title={`Send Rebuy WhatsApp reminder to ${cust.customerName}`}
+                                onClick={() => {
+                                  const msg = generateReorderReminderMessage(cust, {
+                                    invoiceNo: cust.lastInvoiceNo,
+                                    invoiceDate: cust.lastInvoiceDate,
+                                    items: cust.lastItems
+                                  });
+                                  openWhatsAppChat(cust.phone, msg);
+                                  showToast(`Opening WhatsApp chat with ${cust.customerName}`);
+                                }}
+                              >
+                                <MessageCircle size={13} /> WhatsApp
+                              </button>
+
+                              {/* Customize Message Modal Button */}
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                title="Preview and edit rebuy reminder message"
+                                onClick={() => handleOpenReorderModal(cust)}
+                              >
+                                <Send size={12} /> Remind
+                              </button>
+
+                              {/* Quick Create Invoice */}
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                style={{ padding: '4px 6px', fontSize: '0.75rem' }}
+                                title="Create new invoice for this customer"
+                                onClick={() => navigate('/sales/invoices/new')}
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {filteredReorderCustomers.length > reorderItemsPerPage && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Showing {(reorderPage - 1) * reorderItemsPerPage + 1} to {Math.min(reorderPage * reorderItemsPerPage, filteredReorderCustomers.length)} of {filteredReorderCustomers.length} customers
+                </span>
+                <div style={{ display: 'flex', gap: '0.35rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={reorderPage === 1}
+                    onClick={() => setReorderPage(p => p - 1)}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={reorderPage >= totalReorderPages}
+                    onClick={() => setReorderPage(p => p + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Quick Collect Payment Modal */}
       {paymentInvoice && (
         <Modal
@@ -1047,6 +1617,141 @@ export default function SalesDetails() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Customer Rebuy / Restock Reminder Modal */}
+      {reorderModalCustomer && (
+        <Modal
+          isOpen={!!reorderModalCustomer}
+          onClose={() => setReorderModalCustomer(null)}
+          title={`Reorder Reminder — ${reorderModalCustomer.customerName}`}
+          maxWidth="680px"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Sender / Admin Notice */}
+            <div
+              style={{
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px',
+                padding: '0.75rem 1rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '0.82rem'
+              }}
+            >
+              <div>
+                <span style={{ color: '#1e40af', fontWeight: 600 }}>Sender (Admin Mobile):</span>{' '}
+                <strong style={{ color: '#1e3a8a' }}>+91 {ADMIN_MOBILE}</strong> (NSS-TEX Admin)
+              </div>
+              <span style={{ fontSize: '0.72rem', backgroundColor: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                WhatsApp Direct Link
+              </span>
+            </div>
+
+            {/* Recipient Details */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="form-group">
+                <label className="form-label">Customer Mobile Number</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g. 9844953791"
+                  value={reorderModalPhone}
+                  onChange={(e) => setReorderModalPhone(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Customer Email</label>
+                <input
+                  type="email"
+                  className="form-control"
+                  placeholder="e.g. customer@example.com"
+                  value={reorderModalEmail}
+                  onChange={(e) => setReorderModalEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Past Order Summary */}
+            <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '6px', fontSize: '0.8rem', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Last Bill Date:</span>
+                <strong>{formatDate(reorderModalCustomer.lastInvoiceDate)} ({reorderModalCustomer.daysSinceBill} days ago)</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Last Invoice No:</span>
+                <span>{reorderModalCustomer.lastInvoiceNo}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Last Bill Value:</span>
+                <strong style={{ color: 'var(--primary-600)' }}>{formatINR(reorderModalCustomer.lastBillAmount)}</strong>
+              </div>
+            </div>
+
+            {/* Message Preview / Editor */}
+            <div className="form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label className="form-label" style={{ margin: 0 }}>Reminder Message</label>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                  onClick={handleCopyReorderMessage}
+                >
+                  <Copy size={12} /> Copy Message
+                </button>
+              </div>
+              <textarea
+                className="form-control"
+                rows={9}
+                style={{ fontSize: '0.8rem', fontFamily: 'monospace', lineHeight: 1.45 }}
+                value={reorderCustomMessage}
+                onChange={(e) => setReorderCustomMessage(e.target.value)}
+              />
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setReorderModalCustomer(null)}
+              >
+                Close
+              </button>
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                {reorderModalEmail && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleSendReorderEmail}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
+                  >
+                    <Mail size={14} /> Send Email
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn"
+                  style={{
+                    backgroundColor: '#25D366',
+                    color: '#ffffff',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontWeight: 600
+                  }}
+                  onClick={handleSendReorderWhatsApp}
+                >
+                  <MessageCircle size={16} /> Send via WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
         </Modal>
       )}
 

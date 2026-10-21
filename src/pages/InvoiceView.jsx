@@ -11,11 +11,15 @@ import {
   FileText,
   Calendar,
   Send,
-  Truck
+  Truck,
+  MessageCircle,
+  Mail,
+  Copy
 } from 'lucide-react';
 import { api } from '../services/api';
 import { storageService } from '../services/storageService';
-import { formatINR, formatDate } from '../utils/formatters';
+import { formatINR, formatDate, isInvoiceOverdue } from '../utils/formatters';
+import { ADMIN_MOBILE, generatePaymentReminderMessage, openWhatsAppChat, openEmailClient } from '../utils/reminderMessages';
 import Toast from '../components/common/Toast';
 import Modal from '../components/common/Modal';
 import DynamicTypeSelect from '../components/common/DynamicTypeSelect';
@@ -77,6 +81,12 @@ export default function InvoiceView() {
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [payRef, setPayRef] = useState('');
   const [payNotes, setPayNotes] = useState('');
+
+  // Payment Reminder Modal
+  const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+  const [reminderPhone, setReminderPhone] = useState('');
+  const [reminderEmail, setReminderEmail] = useState('');
+  const [reminderMessage, setReminderMessage] = useState('');
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -217,16 +227,43 @@ export default function InvoiceView() {
           )}
 
           {Number(invoice.balanceDue) > 0 && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => {
-                setPayAmount(invoice.balanceDue);
-                setIsPaymentModalOpen(true);
-              }}
-            >
-              <CreditCard size={14} /> Record Payment
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{
+                  backgroundColor: '#25D366',
+                  color: '#ffffff',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontWeight: 600
+                }}
+                onClick={() => {
+                  const phone = invoice.customerSnapshot?.phone || '';
+                  const email = invoice.customerSnapshot?.email || '';
+                  setReminderPhone(phone);
+                  setReminderEmail(email);
+                  setReminderMessage(generatePaymentReminderMessage(invoice));
+                  setIsReminderModalOpen(true);
+                }}
+                title="Send WhatsApp or Email Payment Reminder to Customer"
+              >
+                <MessageCircle size={14} /> Send Reminder
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setPayAmount(invoice.balanceDue);
+                  setIsPaymentModalOpen(true);
+                }}
+              >
+                <CreditCard size={14} /> Record Payment
+              </button>
+            </>
           )}
 
           <button
@@ -519,6 +556,165 @@ export default function InvoiceView() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Payment Reminder Modal */}
+      {isReminderModalOpen && (
+        <Modal
+          isOpen={isReminderModalOpen}
+          onClose={() => setIsReminderModalOpen(false)}
+          title={`Payment Reminder — ${invoice.invoiceNo}`}
+          maxWidth="680px"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Sender Notice */}
+            <div
+              style={{
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px',
+                padding: '0.75rem 1rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '0.82rem'
+              }}
+            >
+              <div>
+                <span style={{ color: '#1e40af', fontWeight: 600 }}>Sender (Admin Mobile):</span>{' '}
+                <strong style={{ color: '#1e3a8a' }}>+91 {ADMIN_MOBILE}</strong> (NSS-TEX Admin)
+              </div>
+              <span style={{ fontSize: '0.72rem', backgroundColor: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                WhatsApp Direct Link
+              </span>
+            </div>
+
+            {/* Recipient Details */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="form-group">
+                <label className="form-label">Customer Mobile Number</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g. 9844953791"
+                  value={reminderPhone}
+                  onChange={(e) => setReminderPhone(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Customer Email</label>
+                <input
+                  type="email"
+                  className="form-control"
+                  placeholder="e.g. customer@example.com"
+                  value={reminderEmail}
+                  onChange={(e) => setReminderEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Invoice Summary Card */}
+            <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '6px', fontSize: '0.8rem', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Customer:</span>
+                <strong>{invoice.customerName}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Invoice Total:</span>
+                <span>{formatINR(invoice.grandTotal)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Due Date:</span>
+                <strong style={{ color: isInvoiceOverdue(invoice) ? '#dc2626' : 'var(--text-main)' }}>
+                  {formatDate(invoice.dueDate)}
+                  {isInvoiceOverdue(invoice) && ' (Overdue)'}
+                </strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px dashed #cbd5e1' }}>
+                <span style={{ fontWeight: 600 }}>Outstanding Balance Due:</span>
+                <strong style={{ color: '#dc2626', fontSize: '0.9rem' }}>{formatINR(invoice.balanceDue)}</strong>
+              </div>
+            </div>
+
+            {/* Message Preview / Textarea */}
+            <div className="form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label className="form-label" style={{ margin: 0 }}>Payment Request Message</label>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '0.72rem', padding: '2px 8px' }}
+                  onClick={() => {
+                    navigator.clipboard.writeText(reminderMessage);
+                    showToast('Reminder message copied to clipboard!');
+                  }}
+                >
+                  <Copy size={12} /> Copy Message
+                </button>
+              </div>
+              <textarea
+                className="form-control"
+                rows={9}
+                style={{ fontSize: '0.8rem', fontFamily: 'monospace', lineHeight: 1.45 }}
+                value={reminderMessage}
+                onChange={(e) => setReminderMessage(e.target.value)}
+              />
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsReminderModalOpen(false)}
+              >
+                Close
+              </button>
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                {reminderEmail && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      openEmailClient(
+                        reminderEmail,
+                        `Payment Reminder: Invoice ${invoice.invoiceNo} — NSS-TEX`,
+                        reminderMessage
+                      );
+                      showToast(`Opening email client for ${reminderEmail}`);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
+                  >
+                    <Mail size={14} /> Send Email
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn"
+                  style={{
+                    backgroundColor: '#25D366',
+                    color: '#ffffff',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontWeight: 600
+                  }}
+                  onClick={() => {
+                    if (!reminderPhone) {
+                      showToast('Please provide a customer mobile number.', 'error');
+                      return;
+                    }
+                    openWhatsAppChat(reminderPhone, reminderMessage);
+                    showToast(`Opening WhatsApp chat to +91 ${reminderPhone}`);
+                  }}
+                >
+                  <MessageCircle size={16} /> Send via WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

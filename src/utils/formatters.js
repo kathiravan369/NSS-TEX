@@ -181,3 +181,83 @@ export function getDaysOverdue(item) {
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   return diffDays > 0 ? diffDays : 0;
 }
+
+/**
+ * Extract clean YYYY-MM-DD due date for an invoice.
+ * Defaults to invoiceDate + 30 days if not explicitly set.
+ */
+export function getInvoiceDueDate(inv) {
+  if (!inv) return '';
+  if (inv.dueDate) {
+    const cleanStr = String(inv.dueDate).includes('T') ? inv.dueDate.split('T')[0] : String(inv.dueDate);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) return cleanStr;
+    const d = new Date(inv.dueDate);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dt = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dt}`;
+    }
+  }
+  return calculateDefaultDueDate(inv.invoiceDate || inv.date, 30);
+}
+
+/**
+ * Checks if an invoice is overdue:
+ * - Payment status is not Paid (balanceDue > 0)
+ * - Due date has passed today's date
+ */
+export function isInvoiceOverdue(inv) {
+  if (!inv) return false;
+  const isPaid = inv.paymentStatus === 'Paid' || Number(inv.balanceDue) <= 0;
+  if (isPaid) return false;
+  const dueStr = getInvoiceDueDate(inv);
+  if (!dueStr) return false;
+  return isDueDateCrossed(dueStr);
+}
+
+/**
+ * Returns precise due status, friendly badge label, and remaining or overdue days
+ */
+export function getInvoiceDueStatus(inv) {
+  if (!inv) return { status: 'none', label: '-', days: 0 };
+  const isPaid = inv.paymentStatus === 'Paid' || Number(inv.balanceDue) <= 0;
+  if (isPaid) {
+    return { status: 'paid', label: 'Settled', days: 0 };
+  }
+
+  const dueStr = getInvoiceDueDate(inv);
+  if (!dueStr) return { status: 'pending', label: 'Pending', days: 0 };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(dueStr);
+  due.setHours(0, 0, 0, 0);
+
+  const diffTime = today.getTime() - due.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays > 0) {
+    return { status: 'overdue', label: `Overdue by ${diffDays}d`, days: diffDays };
+  } else if (diffDays === 0) {
+    return { status: 'today', label: 'Due Today', days: 0 };
+  } else {
+    return { status: 'upcoming', label: `Due in ${Math.abs(diffDays)}d`, days: Math.abs(diffDays) };
+  }
+}
+
+/**
+ * Calculates number of elapsed days between given date and today
+ */
+export function getDaysSinceDate(dateString) {
+  if (!dateString) return 0;
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+
+  const diff = today.getTime() - date.getTime();
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}

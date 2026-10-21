@@ -13,7 +13,7 @@ import {
   Clock
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
-import { isOverdue, formatINR } from '../../utils/formatters';
+import { isOverdue, formatINR, isInvoiceOverdue } from '../../utils/formatters';
 
 export default function TopNav() {
   const location = useLocation();
@@ -22,7 +22,9 @@ export default function TopNav() {
   const [overdueSummary, setOverdueSummary] = useState({
     threadGST: [],
     threadNoGST: [],
-    machinery: []
+    machinery: [],
+    invoicesDue: [],
+    customerReorders: []
   });
 
   useEffect(() => {
@@ -30,10 +32,32 @@ export default function TopNav() {
       const tg = storageService.getCollection('threadGST').filter(x => isOverdue(x));
       const tng = storageService.getCollection('threadNoGST').filter(x => isOverdue(x));
       const mach = storageService.getCollection('machinery').filter(x => isOverdue(x));
+
+      // Customer Invoices Due / Overdue
+      const allInvoices = storageService.getCollection('invoices') || [];
+      const invsDue = allInvoices.filter(x => x.invoiceStatus !== 'Cancelled' && isInvoiceOverdue(x));
+
+      // Customer 30+ days rebuy reminder check
+      const now = new Date();
+      const customerLastBill = new Map();
+      allInvoices.forEach(inv => {
+        if (inv.invoiceStatus === 'Cancelled') return;
+        const key = String(inv.customerId || inv.customerName);
+        if (!key) return;
+        const dt = new Date(inv.invoiceDate);
+        if (isNaN(dt.getTime())) return;
+        if (!customerLastBill.has(key) || customerLastBill.get(key).date < dt) {
+          customerLastBill.set(key, { name: inv.customerName, date: dt, days: Math.floor((now - dt) / (1000 * 60 * 60 * 24)) });
+        }
+      });
+      const reordersDue = Array.from(customerLastBill.values()).filter(c => c.days >= 30);
+
       setOverdueSummary({
         threadGST: tg,
         threadNoGST: tng,
-        machinery: mach
+        machinery: mach,
+        invoicesDue: invsDue,
+        customerReorders: reordersDue
       });
     };
 
@@ -45,7 +69,9 @@ export default function TopNav() {
   const totalOverdues =
     overdueSummary.threadGST.length +
     overdueSummary.threadNoGST.length +
-    overdueSummary.machinery.length;
+    overdueSummary.machinery.length +
+    overdueSummary.invoicesDue.length +
+    (overdueSummary.customerReorders.length > 0 ? 1 : 0);
 
   // Helper to build breadcrumb segments
   const getBreadcrumbs = () => {
@@ -309,6 +335,52 @@ export default function TopNav() {
                     </div>
                   )}
 
+                  {overdueSummary.invoicesDue.length > 0 && (
+                    <div
+                      onClick={() => {
+                        setIsNotifOpen(false);
+                        navigate('/sales/invoices?tab=due');
+                      }}
+                      style={{
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: '#fff1f2',
+                        border: '1px solid #fecdd3',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#be123c', fontWeight: 600, fontSize: '0.8rem' }}>
+                        <AlertTriangle size={14} /> Customer Invoices Overdue
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#881337', marginTop: '2px' }}>
+                        {overdueSummary.invoicesDue.length} invoice(s) have passed payment due date (Total: {formatINR(overdueSummary.invoicesDue.reduce((sum, i) => sum + (Number(i.balanceDue) || 0), 0))}).
+                      </div>
+                    </div>
+                  )}
+
+                  {overdueSummary.customerReorders.length > 0 && (
+                    <div
+                      onClick={() => {
+                        setIsNotifOpen(false);
+                        navigate('/sales/reports?tab=reorder');
+                      }}
+                      style={{
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: '#fffbeb',
+                        border: '1px solid #fde68a',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#b45309', fontWeight: 600, fontSize: '0.8rem' }}>
+                        <Clock size={14} /> Customer Reorders (30+ Days)
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#92400e', marginTop: '2px' }}>
+                        {overdueSummary.customerReorders.length} customer(s) bought goods over 30 days ago. Click to send rebuy reminders.
+                      </div>
+                    </div>
+                  )}
+
                   {overdueSummary.machinery.length > 0 && (
                     <div
                       onClick={() => {
@@ -335,8 +407,8 @@ export default function TopNav() {
               ) : (
                 <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>
                   <CheckCircle2 size={24} color="#16a34a" style={{ margin: '0 auto 0.4rem' }} />
-                  <div>No pending overdue payments!</div>
-                  <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>All 45-day supplier dues are on schedule.</div>
+                  <div>No pending dues or reminders!</div>
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>All customer and supplier payments are on schedule.</div>
                 </div>
               )}
             </div>

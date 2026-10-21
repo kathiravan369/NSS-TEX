@@ -357,6 +357,9 @@ export const api = {
       },
       getGST(params = {}) {
         return request(`/sales/reports/gst${buildQuery(params)}`);
+      },
+      getReorderReminders(params = {}) {
+        return request(`/sales/reports/reorder-reminders${buildQuery(params)}`);
       }
     }
   },

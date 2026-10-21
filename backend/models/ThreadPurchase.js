@@ -19,6 +19,7 @@ const ThreadPurchase = new PgModel('thread_purchases', {
   invoiceNo: { column: 'invoice_no', type: 'string' },
   status: { column: 'status', type: 'string' },
   notes: { column: 'notes', type: 'string' },
+  items: { column: 'items', type: 'json' },
   createdAt: { column: 'created_at', type: 'date' },
   updatedAt: { column: 'updated_at', type: 'date' }
 });

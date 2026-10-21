@@ -15,7 +15,9 @@ import {
   Lock,
   Eye,
   Edit2,
-  Trash2
+  Trash2,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import MetricCard from '../components/common/MetricCard';
 import DataTable from '../components/common/DataTable';
@@ -55,9 +57,52 @@ const INITIAL_FORM = {
   notes: ''
 };
 
+const DEFAULT_COTTON_ITEMS = [];
+
+const AVAILABLE_COTTON_OPTIONS = [
+  'White Cotton',
+  'Red Cotton',
+  'Blue Cotton',
+  'Green Cotton',
+  'Yellow Cotton',
+  'Black Cotton',
+  'Grey Melange',
+  'Organic Cotton',
+  '40s Combed Cotton'
+];
+
+const getVarietyBadgeStyle = (name, index) => {
+  const lower = (name || '').toLowerCase();
+  if (lower.includes('white')) return { bg: '#f1f5f9', color: '#334155' };
+  if (lower.includes('red') || lower.includes('rose') || lower.includes('pink') || lower.includes('crimson')) return { bg: '#fee2e2', color: '#dc2626' };
+  if (lower.includes('blue') || lower.includes('navy') || lower.includes('indigo')) return { bg: '#eff6ff', color: '#2563eb' };
+  if (lower.includes('green') || lower.includes('emerald') || lower.includes('mint')) return { bg: '#ecfdf5', color: '#059669' };
+  if (lower.includes('yellow') || lower.includes('amber') || lower.includes('gold')) return { bg: '#fef3c7', color: '#d97706' };
+  if (lower.includes('purple') || lower.includes('violet')) return { bg: '#f3e8ff', color: '#7c3aed' };
+  if (lower.includes('black') || lower.includes('charcoal')) return { bg: '#1e293b', color: '#f8fafc' };
+  if (lower.includes('grey') || lower.includes('gray')) return { bg: '#f1f5f9', color: '#475569' };
+  if (lower.includes('orange') || lower.includes('coral')) return { bg: '#ffedd5', color: '#ea580c' };
+
+  const palette = [
+    { bg: '#fee2e2', color: '#dc2626' },
+    { bg: '#ecfdf5', color: '#059669' },
+    { bg: '#eff6ff', color: '#2563eb' },
+    { bg: '#fef3c7', color: '#d97706' },
+    { bg: '#f3e8ff', color: '#7c3aed' },
+    { bg: '#f1f5f9', color: '#334155' }
+  ];
+  return palette[index % palette.length];
+};
+
 export default function ThreadPurchaseGST() {
   const [items, setItems] = useState([]);
   const [formData, setFormData] = useState(INITIAL_FORM);
+  const [cottonItems, setCottonItems] = useState(DEFAULT_COTTON_ITEMS);
+  const [availableVarieties, setAvailableVarieties] = useState(AVAILABLE_COTTON_OPTIONS);
+  const [selectedVarietyToAdd, setSelectedVarietyToAdd] = useState('');
+  const [isCottonDropdownOpen, setIsCottonDropdownOpen] = useState(false);
+  const [showAddVariety, setShowAddVariety] = useState(false);
+  const [newVarietyName, setNewVarietyName] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [viewingItem, setViewingItem] = useState(null);
@@ -110,8 +155,85 @@ export default function ThreadPurchaseGST() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Live Auto-Calculations
-  const subtotal = (Number(formData.qty) || 0) * (Number(formData.rate) || 0);
+  const handleCottonItemChange = (index, field, value) => {
+    setCottonItems(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleSelectVariety = (varietyName) => {
+    if (!varietyName) return;
+    setCottonItems(prev => {
+      if (prev.some(it => it.name.toLowerCase() === varietyName.toLowerCase())) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id: `c_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          name: varietyName,
+          qty: '',
+          rate: '',
+          unit: formData.unit || 'Kg'
+        }
+      ];
+    });
+    setSelectedVarietyToAdd('');
+    setIsCottonDropdownOpen(true);
+  };
+
+  const handleAddCustomVariety = () => {
+    const trimmed = (newVarietyName || '').trim();
+    if (!trimmed) return;
+
+    setAvailableVarieties(prev => {
+      if (!prev.some(v => v.toLowerCase() === trimmed.toLowerCase())) {
+        return [...prev, trimmed];
+      }
+      return prev;
+    });
+
+    setCottonItems(prev => {
+      if (prev.some(it => it.name.toLowerCase() === trimmed.toLowerCase())) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          id: `c_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          name: trimmed,
+          qty: '',
+          rate: '',
+          unit: formData.unit || 'Kg'
+        }
+      ];
+    });
+
+    setNewVarietyName('');
+    setShowAddVariety(false);
+    setIsCottonDropdownOpen(true);
+  };
+
+  const handleRemoveCottonItem = (index) => {
+    setCottonItems(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  // Live Auto-Calculations based on Cotton Items
+  const totalQty = useMemo(() => {
+    return cottonItems.reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
+  }, [cottonItems]);
+
+  const subtotal = useMemo(() => {
+    return cottonItems.reduce((acc, it) => acc + ((Number(it.qty) || 0) * (Number(it.rate) || 0)), 0);
+  }, [cottonItems]);
+
+  const avgRate = totalQty > 0 ? Math.round((subtotal / totalQty) * 100) / 100 : 0;
+  const activeCottonItemsCount = useMemo(() => {
+    return cottonItems.filter(it => (Number(it.qty) > 0 || Number(it.rate) > 0)).length;
+  }, [cottonItems]);
+
   const gstAmount = (subtotal * (Number(formData.gstRate) || 0)) / 100;
   const totalAmount = subtotal + gstAmount;
 
@@ -246,8 +368,15 @@ export default function ThreadPurchaseGST() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.supplier || !formData.threadType || !formData.qty || !formData.rate) {
-      showToast('Please fill all required fields.', 'error');
+    if (!formData.supplier) {
+      showToast('Please enter the supplier name.', 'error');
+      return;
+    }
+
+    const activeItems = cottonItems.filter(it => (Number(it.qty) > 0 || Number(it.rate) > 0) && String(it.name || '').trim());
+    if (activeItems.length === 0) {
+      showToast('Please enter quantity and rate for at least one cotton variety.', 'error');
+      setIsCottonDropdownOpen(true);
       return;
     }
 
@@ -263,12 +392,15 @@ export default function ThreadPurchaseGST() {
       : null;
 
     const effectiveDueDate = formData.dueDate || calculateDefaultDueDate(formData.date, 45);
+    const threadTypeName = activeItems.map(it => it.name).join(', ');
 
     const payload = {
       ...formData,
       dueDate: effectiveDueDate,
-      qty: Number(formData.qty),
-      rate: Number(formData.rate),
+      threadType: threadTypeName,
+      qty: totalQty,
+      rate: avgRate,
+      unit: formData.unit || 'Kg',
       gstRate: Number(formData.gstRate),
       subtotal,
       gstAmount,
@@ -277,6 +409,16 @@ export default function ThreadPurchaseGST() {
       balanceAmount: effectiveBalance,
       status: effectiveStatus,
       paidAt,
+      items: activeItems.map(it => ({
+        id: it.id,
+        name: it.name,
+        cottonType: it.name,
+        threadType: it.name,
+        qty: Number(it.qty) || 0,
+        rate: Number(it.rate) || 0,
+        unit: formData.unit || it.unit || 'Kg',
+        subtotal: (Number(it.qty) || 0) * (Number(it.rate) || 0)
+      })),
       invoiceNo: formData.invoiceNo || `INV-0036-${String(Math.floor(100 + Math.random() * 900))}`
     };
 
@@ -291,6 +433,10 @@ export default function ThreadPurchaseGST() {
 
     setIsModalOpen(false);
     setFormData(INITIAL_FORM);
+    setCottonItems(DEFAULT_COTTON_ITEMS);
+    setIsCottonDropdownOpen(false);
+    setShowAddVariety(false);
+    setNewVarietyName('');
     await loadData(false);
   };
 
@@ -323,6 +469,30 @@ export default function ThreadPurchaseGST() {
       paidAmount: paid,
       notes: item.notes || ''
     });
+
+    if (Array.isArray(item.items) && item.items.length > 0) {
+      setCottonItems(item.items.map((x, i) => ({
+        id: x.id || `c_${i}_${Date.now()}`,
+        name: x.name || x.cottonType || x.threadType || `Variety ${i + 1}`,
+        qty: x.qty !== undefined && x.qty !== null ? x.qty : '',
+        rate: x.rate !== undefined && x.rate !== null ? x.rate : '',
+        unit: x.unit || item.unit || 'Kg'
+      })));
+    } else if (item.threadType) {
+      setCottonItems([{
+        id: 'c_legacy',
+        name: item.threadType,
+        qty: item.qty || '',
+        rate: item.rate || '',
+        unit: item.unit || 'Kg'
+      }]);
+    } else {
+      setCottonItems(DEFAULT_COTTON_ITEMS);
+    }
+
+    setShowAddVariety(false);
+    setNewVarietyName('');
+    setIsCottonDropdownOpen(false);
     setIsModalOpen(true);
   };
 
@@ -477,6 +647,10 @@ export default function ThreadPurchaseGST() {
             onClick={() => {
               setEditingId(null);
               setFormData(INITIAL_FORM);
+              setCottonItems(DEFAULT_COTTON_ITEMS);
+              setShowAddVariety(false);
+              setNewVarietyName('');
+              setIsCottonDropdownOpen(false);
               setIsModalOpen(true);
             }}
           >
@@ -629,6 +803,9 @@ export default function ThreadPurchaseGST() {
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
+          setIsCottonDropdownOpen(false);
+          setShowAddVariety(false);
+          setNewVarietyName('');
           setEditingId(null);
         }}
         title={editingId ? 'Edit Thread Purchase (With GST)' : 'Add Thread Purchase (With GST)'}
@@ -774,29 +951,6 @@ export default function ThreadPurchaseGST() {
                 ))}
               </datalist>
             </div>
-            <div className="form-group">
-              <label className="form-label">Thread Type <span className="required">*</span></label>
-              <DynamicTypeSelect
-                category="thread_type"
-                value={formData.threadType}
-                onChange={(val) => setFormData({ ...formData, threadType: val })}
-                label="Thread Type"
-                placeholder="Select Thread Type"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Quantity <span className="required">*</span></label>
-              <input
-                type="number"
-                min="1"
-                className="form-control"
-                placeholder="Enter quantity"
-                value={formData.qty}
-                onChange={(e) => setFormData({ ...formData, qty: e.target.value })}
-                required
-              />
-            </div>
 
             <div className="form-group">
               <label className="form-label">Unit <span className="required">*</span></label>
@@ -810,19 +964,467 @@ export default function ThreadPurchaseGST() {
                 <option value="Cones">Cones</option>
               </select>
             </div>
-            <div className="form-group">
-              <label className="form-label">Rate per Unit (₹) <span className="required">*</span></label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                className="form-control"
-                placeholder="Enter rate"
-                value={formData.rate}
-                onChange={(e) => setFormData({ ...formData, rate: e.target.value })}
-                required
-              />
+
+            {/* Cotton Rate Details as Dropdown */}
+            <div className="form-group col-span-full" style={{ marginTop: '0.4rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label className="form-label" style={{ margin: 0, fontWeight: 600 }}>
+                  Cotton Rate Details <span className="required">*</span>
+                </label>
+                {activeCottonItemsCount > 0 && (
+                  <span style={{
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    color: '#0369a1',
+                    backgroundColor: '#e0f2fe',
+                    padding: '2px 8px',
+                    borderRadius: '12px'
+                  }}>
+                    {activeCottonItemsCount} active {activeCottonItemsCount === 1 ? 'variety' : 'varieties'} • {totalQty} {formData.unit || 'Kg'} • {formatINR(subtotal)}
+                  </span>
+                )}
+              </div>
+
+              {/* Dropdown Box trigger - click to open/close */}
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setIsCottonDropdownOpen(prev => !prev)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setIsCottonDropdownOpen(prev => !prev);
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.85rem 1.15rem',
+                  backgroundColor: isCottonDropdownOpen ? '#f8fafc' : '#ffffff',
+                  border: isCottonDropdownOpen ? '1.5px solid var(--primary-600, #2563eb)' : '1px solid #cbd5e1',
+                  borderRadius: isCottonDropdownOpen ? '12px 12px 0 0' : '12px',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  transition: 'all 0.15s ease',
+                  boxShadow: isCottonDropdownOpen ? '0 2px 4px rgba(37,99,235,0.08)' : '0 1px 2px rgba(0,0,0,0.03)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '9px',
+                    backgroundColor: activeCottonItemsCount > 0 ? '#eff6ff' : '#f1f5f9',
+                    color: activeCottonItemsCount > 0 ? 'var(--primary-600, #2563eb)' : '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Package size={20} />
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: '0.92rem', fontWeight: 600, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>
+                        {activeCottonItemsCount > 0
+                          ? `${activeCottonItemsCount} Cotton ${activeCottonItemsCount === 1 ? 'Variety' : 'Varieties'} Configured`
+                          : 'Select / Enter Cotton Rate Details'}
+                      </span>
+                      {activeCottonItemsCount > 0 && (
+                        <span style={{ fontSize: '0.85rem', color: 'var(--primary-600, #2563eb)', fontWeight: 700 }}>
+                          ({formatINR(subtotal)})
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isCottonDropdownOpen
+                        ? 'Click to collapse rate details'
+                        : (activeCottonItemsCount > 0
+                            ? cottonItems
+                                .filter(it => Number(it.qty) > 0 || Number(it.rate) > 0)
+                                .map(it => `${it.name}: ${it.qty} ${formData.unit || 'Kg'} @ ₹${it.rate}`)
+                                .join(' • ')
+                            : (cottonItems.length > 0
+                                ? cottonItems.map(it => it.name).join(' • ')
+                                : 'Click this dropdown to select varieties (Red, Green, White...)'))}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    color: isCottonDropdownOpen ? 'var(--primary-600, #2563eb)' : '#64748b'
+                  }}>
+                    {isCottonDropdownOpen ? 'Hide Details' : 'Show Details'}
+                  </span>
+                  <ChevronDown
+                    size={18}
+                    style={{
+                      color: isCottonDropdownOpen ? 'var(--primary-600, #2563eb)' : '#64748b',
+                      transform: isCottonDropdownOpen ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Dropdown Content - NOT shown on screen until the dropdown box is clicked */}
+              {isCottonDropdownOpen && (
+                <div style={{
+                  border: '1.5px solid var(--primary-600, #2563eb)',
+                  borderTop: 'none',
+                  borderRadius: '0 0 12px 12px',
+                  padding: '1.25rem',
+                  backgroundColor: '#ffffff',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+                }}>
+                  {/* Extra Dropdown: Select Cotton Variety / Color */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    marginBottom: '1rem',
+                    padding: '0.85rem 1rem',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    flexWrap: 'wrap'
+                  }}>
+                    <div style={{ flex: '1 1 280px' }}>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#334155', marginBottom: '5px' }}>
+                        Select Cotton Variety / Color to Add:
+                      </label>
+                      <select
+                        className="form-control"
+                        value={selectedVarietyToAdd}
+                        onChange={(e) => handleSelectVariety(e.target.value)}
+                        style={{
+                          fontWeight: 500,
+                          backgroundColor: '#ffffff',
+                          borderColor: '#cbd5e1',
+                          cursor: 'pointer',
+                          fontSize: '0.88rem'
+                        }}
+                      >
+                        <option value="">-- Choose Cotton Variety (e.g. Red, Green, White...) --</option>
+                        {availableVarieties.map((v) => {
+                          const isAlreadyAdded = cottonItems.some(it => it.name.toLowerCase() === v.toLowerCase());
+                          return (
+                            <option key={v} value={v} disabled={isAlreadyAdded}>
+                              {v} {isAlreadyAdded ? '✓ (Already on screen)' : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Cotton Varieties List - only show selected ones, NO default data */}
+                  {cottonItems.length === 0 ? (
+                    <div style={{
+                      padding: '1.75rem 1rem',
+                      textAlign: 'center',
+                      backgroundColor: '#f8fafc',
+                      border: '1.5px dashed #cbd5e1',
+                      borderRadius: '10px',
+                      color: '#64748b',
+                      margin: '0.5rem 0 1rem 0'
+                    }}>
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '50%',
+                        backgroundColor: '#eff6ff',
+                        color: '#2563eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 8px auto'
+                      }}>
+                        <Package size={22} />
+                      </div>
+                      <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.92rem' }}>
+                        No Cotton Varieties Selected Yet
+                      </div>
+                      <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                        Choose a variety from the dropdown above (e.g. <strong>Red Cotton</strong>, <strong>Green Cotton</strong>) to enter quantity & rate, or click <strong>Add Cotton Variety (+)</strong>.
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {cottonItems.map((item, idx) => {
+                        const badge = getVarietyBadgeStyle(item.name, idx);
+                        return (
+                          <div
+                            key={item.id || idx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.75rem 0.5rem',
+                              borderBottom: idx < cottonItems.length - 1 ? '1px solid #f1f5f9' : 'none',
+                              flexWrap: 'wrap',
+                              gap: '1rem'
+                            }}
+                          >
+                            {/* Left: Icon Badge & Name / Subtitle */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '220px' }}>
+                              <div style={{
+                                width: '46px',
+                                height: '46px',
+                                borderRadius: '10px',
+                                backgroundColor: badge.bg,
+                                color: badge.color,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                <Package size={22} color={badge.color} />
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a' }}>
+                                  {item.name}
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
+                                  Quantity and rate per unit ({formData.unit || 'Kg'})
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Right: Qty Box, Rate Box & Remove Button */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                              {/* Qty Card */}
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyCenter: 'center',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '8px',
+                                padding: '6px 14px',
+                                minWidth: '110px',
+                                backgroundColor: '#ffffff',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                              }}>
+                                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, marginBottom: '2px' }}>
+                                  Qty ({formData.unit || 'Kg'})
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={item.qty}
+                                  onChange={(e) => handleCottonItemChange(idx, 'qty', e.target.value)}
+                                  placeholder="0"
+                                  style={{
+                                    border: 'none',
+                                    outline: 'none',
+                                    background: 'transparent',
+                                    fontSize: '1rem',
+                                    fontWeight: 500,
+                                    color: '#0f172a',
+                                    padding: 0,
+                                    width: '100%'
+                                  }}
+                                />
+                              </div>
+
+                              {/* Rate Card */}
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyCenter: 'center',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '8px',
+                                padding: '6px 14px',
+                                minWidth: '130px',
+                                backgroundColor: '#ffffff',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                              }}>
+                                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, marginBottom: '2px' }}>
+                                  Rate (₹)
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={item.rate}
+                                  onChange={(e) => handleCottonItemChange(idx, 'rate', e.target.value)}
+                                  placeholder="0"
+                                  style={{
+                                    border: 'none',
+                                    outline: 'none',
+                                    background: 'transparent',
+                                    fontSize: '1rem',
+                                    fontWeight: 500,
+                                    color: '#0f172a',
+                                    padding: 0,
+                                    width: '100%'
+                                  }}
+                                />
+                              </div>
+
+                              {/* Delete / Remove Action - can remove any item */}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCottonItem(idx)}
+                                title={`Remove ${item.name}`}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#94a3b8',
+                                  cursor: 'pointer',
+                                  padding: '8px',
+                                  borderRadius: '6px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.color = '#dc2626';
+                                  e.currentTarget.style.backgroundColor = '#fee2e2';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.color = '#94a3b8';
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Summary footer */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingTop: '0.85rem',
+                    marginTop: '0.75rem',
+                    borderTop: '1px solid #f1f5f9',
+                    fontSize: '0.825rem',
+                    flexWrap: 'wrap',
+                    gap: '0.5rem'
+                  }}>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      Active Varieties: <strong>{activeCottonItemsCount}</strong> | Total Quantity:{' '}
+                      <strong style={{ color: '#0f172a' }}>{totalQty} {formData.unit || 'Kg'}</strong>
+                    </span>
+                    <span style={{ color: '#0f172a', fontWeight: 600 }}>
+                      Cotton Subtotal:{' '}
+                      <strong style={{ color: 'var(--primary-600)', fontSize: '0.95rem' }}>
+                        {formatINR(subtotal)}
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Under the drop down add customized button to add cotton variety */}
+              <div style={{ marginTop: '0.65rem' }}>
+                {!showAddVariety ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCottonDropdownOpen(true);
+                      setShowAddVariety(true);
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 18px',
+                      backgroundColor: '#eff6ff',
+                      border: '1.5px dashed var(--primary-500, #3b82f6)',
+                      borderRadius: '8px',
+                      color: 'var(--primary-700, #1d4ed8)',
+                      fontWeight: 600,
+                      fontSize: '0.83rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#dbeafe';
+                      e.currentTarget.style.borderColor = 'var(--primary-600, #2563eb)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#eff6ff';
+                      e.currentTarget.style.borderColor = 'var(--primary-500, #3b82f6)';
+                    }}
+                  >
+                    <Plus size={16} color="var(--primary-600, #2563eb)" />
+                    <span>Add Cotton Variety (+)</span>
+                  </button>
+                ) : (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    padding: '0.85rem 1rem',
+                    backgroundColor: '#f8fafc',
+                    border: '1.5px dashed var(--primary-500, #3b82f6)',
+                    borderRadius: '10px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
+                  }}>
+                    <input
+                      type="text"
+                      list="cotton-variety-list"
+                      className="form-control"
+                      placeholder="Enter cotton variety name (e.g. Green Cotton, Grey Melange, 40s Combed)..."
+                      value={newVarietyName}
+                      onChange={(e) => setNewVarietyName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomVariety();
+                        }
+                      }}
+                      autoFocus
+                      style={{ flex: 1, backgroundColor: '#ffffff' }}
+                    />
+                    <datalist id="cotton-variety-list">
+                      <option value="White Cotton" />
+                      <option value="Red Cotton" />
+                      <option value="Blue Cotton" />
+                      <option value="Green Cotton" />
+                      <option value="Yellow Cotton" />
+                      <option value="Grey Melange" />
+                      <option value="40s Combed" />
+                      <option value="Organic Cotton" />
+                    </datalist>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleAddCustomVariety}
+                      disabled={!newVarietyName.trim()}
+                      style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Check size={14} /> Add Variety
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setShowAddVariety(false);
+                        setNewVarietyName('');
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
+
             <div className="form-group">
               <label className="form-label">Subtotal (₹)</label>
               <input
@@ -830,6 +1432,7 @@ export default function ThreadPurchaseGST() {
                 className="form-control"
                 readOnly
                 value={formatINR(subtotal)}
+                style={{ backgroundColor: '#f8fafc', fontWeight: 600 }}
               />
             </div>
             <div className="form-group">
@@ -852,6 +1455,7 @@ export default function ThreadPurchaseGST() {
                 className="form-control"
                 readOnly
                 value={formatINR(gstAmount)}
+                style={{ backgroundColor: '#f8fafc' }}
               />
             </div>
             <div className="form-group">
@@ -860,7 +1464,7 @@ export default function ThreadPurchaseGST() {
                 type="text"
                 className="form-control"
                 readOnly
-                style={{ fontWeight: 700, color: 'var(--primary-600)' }}
+                style={{ fontWeight: 700, color: 'var(--primary-600)', backgroundColor: '#f8fafc' }}
                 value={formatINR(totalAmount)}
               />
             </div>
@@ -924,6 +1528,10 @@ export default function ThreadPurchaseGST() {
               onClick={() => {
                 setIsModalOpen(false);
                 setFormData(INITIAL_FORM);
+                setCottonItems(DEFAULT_COTTON_ITEMS);
+                setIsCottonDropdownOpen(false);
+                setShowAddVariety(false);
+                setNewVarietyName('');
                 setEditingId(null);
               }}
             >
@@ -1152,6 +1760,53 @@ export default function ThreadPurchaseGST() {
                 <div><strong style={{ color: 'var(--text-muted)' }}>Balance Amount:</strong> <strong style={{ color: vBalance > 0 ? '#d97706' : '#64748b' }}>{formatINR(vBalance)}</strong></div>
                 <div><strong style={{ color: 'var(--text-muted)' }}>Payment Status:</strong> <StatusBadge status={getPaymentStatus(viewingItem)} isLocked={isPaidLocked(viewingItem)} /></div>
               </div>
+
+              {/* Cotton Varieties Breakdown Table */}
+              {Array.isArray(viewingItem.items) && viewingItem.items.length > 0 && (
+                <div style={{ marginTop: '0.25rem' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                    Cotton Varieties Breakdown ({viewingItem.items.length})
+                  </h4>
+                  <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                          <th style={{ padding: '8px 12px', color: 'var(--text-muted)', width: '45px' }}>#</th>
+                          <th style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>Cotton Variety / Name</th>
+                          <th style={{ padding: '8px 12px', color: 'var(--text-muted)', textAlign: 'right' }}>Quantity</th>
+                          <th style={{ padding: '8px 12px', color: 'var(--text-muted)', textAlign: 'right' }}>Rate (₹)</th>
+                          <th style={{ padding: '8px 12px', color: 'var(--text-muted)', textAlign: 'right' }}>Subtotal (₹)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {viewingItem.items.map((it, idx) => (
+                          <tr key={it.id || idx} style={{ borderBottom: idx < viewingItem.items.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                            <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>{idx + 1}</td>
+                            <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-main)' }}>{it.name || it.cottonType || it.threadType}</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right' }}>{it.qty} {it.unit || viewingItem.unit || 'Kg'}</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right' }}>₹ {it.rate}</td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--primary-600)' }}>
+                              {formatINR(it.subtotal || ((Number(it.qty) || 0) * (Number(it.rate) || 0)))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot style={{ backgroundColor: '#f8fafc', borderTop: '1px solid var(--border-color)', fontWeight: 600 }}>
+                        <tr>
+                          <td colSpan={2} style={{ padding: '8px 12px' }}>Total</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                            {viewingItem.items.reduce((s, x) => s + (Number(x.qty) || 0), 0)} {viewingItem.unit || 'Kg'}
+                          </td>
+                          <td></td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--primary-600)' }}>
+                            {formatINR(viewingItem.subtotal)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
             {viewingItem.notes && (
               <div style={{ marginTop: '0.5rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)' }}>
                 <strong style={{ color: 'var(--text-muted)' }}>Notes:</strong> {viewingItem.notes}
