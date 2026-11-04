@@ -231,6 +231,9 @@ export default function TowelPurchaseNoGST() {
   }, [towelItems]);
 
   const avgRate = totalQty > 0 ? Math.round((subtotal / totalQty) * 100) / 100 : 0;
+  const activeTowelItemsCount = useMemo(() => {
+    return towelItems.filter(it => (Number(it.qty) > 0 || Number(it.rate) > 0)).length;
+  }, [towelItems]);
   const totalAmount = subtotal; // No GST for this module
 
   const currentPaid = formData.paidAmount !== '' && formData.paidAmount !== undefined

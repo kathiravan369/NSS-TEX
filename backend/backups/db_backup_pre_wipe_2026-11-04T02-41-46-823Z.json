@@ -1,0 +1,26 @@
+{
+  "customers": [],
+  "electricity_expenses": [],
+  "employees": [],
+  "invoices": [],
+  "machinery_expenses": [],
+  "master_types": [
+    {
+      "id": 1,
+      "category": "towel_supplier",
+      "name": "30X60",
+      "code": "",
+      "description": "",
+      "extra_data": {},
+      "is_active": true,
+      "created_at": "2026-11-02T10:14:14.806Z",
+      "updated_at": "2026-11-02T10:14:14.806Z"
+    }
+  ],
+  "oil_purchases": [],
+  "oil_stock": [],
+  "sales_payments": [],
+  "thread_purchases": [],
+  "towel_purchases": [],
+  "weekly_payroll": []
+}
