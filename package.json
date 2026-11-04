@@ -45,12 +45,27 @@
       ],
       "icon": "electron/logo.ico"
     },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.utilities",
+      "icon": "electron/logo.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "electron/logo.png"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "NSS-TEX ERP"
+      "shortcutName": "NSS-TEX ERP",
+      "installerIcon": "electron/logo.ico",
+      "uninstallerIcon": "electron/logo.ico",
+      "installerHeaderIcon": "electron/logo.ico"
     }
   },
   "dependencies": {

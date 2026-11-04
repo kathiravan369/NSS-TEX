@@ -1,0 +1,44 @@
+{
+  "name": "NSS-TEX ERP",
+  "short_name": "NSS-TEX",
+  "description": "NSS TOWELS / TexMan ERP Manufacturing Management Desktop Application",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "./favicon.ico",
+      "sizes": "16x16 24x24 32x32 48x48 64x64",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "./favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "./favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ]
+}
+
