@@ -54,7 +54,7 @@ function getPoolConfigForBusiness(bizId) {
     host: process.env.PGHOST || 'localhost',
     port: process.env.PGPORT ? Number(process.env.PGPORT) : 5000,
     user: process.env.PGUSER || 'postgres',
-    password: process.env.PGPASSWORD || '',
+    password: process.env.PGPASSWORD || 'Skathir@123',
     database: biz.database,
     max: 20,
     idleTimeoutMillis: 30000,
@@ -222,8 +222,25 @@ function getBusinessList() {
   }));
 }
 
+/**
+ * Gracefully close all PostgreSQL connection pools
+ */
+async function closePools() {
+  for (const [bizId, pool] of pools.entries()) {
+    try {
+      await pool.end();
+      console.log(`[PostgreSQL] Connection pool for business "${bizId}" closed.`);
+    } catch (err) {
+      console.warn(`[PostgreSQL] Error closing pool for business "${bizId}":`, err.message);
+    }
+  }
+  pools.clear();
+  connectionStatus.clear();
+}
+
 module.exports = {
   connectDB,
+  closePools,
   getPool,
   isDbConnected,
   query,

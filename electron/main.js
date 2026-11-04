@@ -12,63 +12,161 @@ if (process.platform === 'win32') {
 
 const BACKEND_PORT = process.env.PORT || 5001;
 let backendProcess = null;
+let serverModule = null;
 let mainWindow = null;
+
+// Persistent file logger
+let logFilePath = null;
+function log(...args) {
+  try {
+    if (!logFilePath) {
+      logFilePath = path.join(app.getPath('userData'), 'nss-erp.log');
+    }
+    const msg = `[${new Date().toISOString()}] ${args.map(a => (typeof a === 'object' ? JSON.stringify(a) : a)).join(' ')}\n`;
+    fs.appendFileSync(logFilePath, msg);
+  } catch (e) {}
+  console.log(...args);
+}
+
+/**
+ * Ping backend health endpoint to check readiness
+ */
+function pingBackendHealth(port, timeoutMs = 800) {
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        hostname: '127.0.0.1',
+        port,
+        path: '/api/health',
+        method: 'GET',
+        timeout: timeoutMs
+      },
+      (res) => {
+        resolve(res.statusCode === 200 || res.statusCode === 503);
+      }
+    );
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.end();
+  });
+}
+
+/**
+ * Wait for backend server to become responsive
+ */
+async function waitForBackendReady(port, maxWaitMs = 12000) {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    const ok = await pingBackendHealth(port, 700);
+    if (ok) return true;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return false;
+}
 
 /**
  * Automatically launch the Express/PostgreSQL backend server if not already running
  */
-function startBackendServer() {
-  const checkReq = http.request(
-    `http://localhost:${BACKEND_PORT}/api/health`,
-    { method: 'GET', timeout: 1000 },
-    () => {
-      console.log(`[Electron] Backend server is already running on port ${BACKEND_PORT}`);
-    }
-  );
+async function startBackendServer() {
+  log(`Starting backend server initialization on port ${BACKEND_PORT}...`);
 
-  checkReq.on('error', () => {
+  // 1. Check if backend is already listening and responsive
+  const alreadyRunning = await pingBackendHealth(BACKEND_PORT, 1000);
+  if (alreadyRunning) {
+    log(`Backend server is already running and responsive on port ${BACKEND_PORT}`);
+    return true;
+  }
+
+  // 2. Try in-process execution via server module (primary & most reliable in packaged Electron)
+  try {
+    log('Attempting in-process backend startup...');
     try {
-      const serverScript = app.isPackaged
-        ? path.join(process.resourcesPath, 'backend', 'server.js')
-        : path.join(__dirname, '../backend/server.js');
+      serverModule = require('../backend/server.js');
+    } catch (e1) {
+      log('Direct require(../backend/server.js) note:', e1.message);
+      const asarPath = path.join(process.resourcesPath, 'app.asar', 'backend', 'server.js');
+      serverModule = require(asarPath);
+    }
 
-      if (!fs.existsSync(serverScript)) {
-        console.warn(`[Electron] Backend script not found at: ${serverScript}`);
-        return;
+    if (serverModule && typeof serverModule.startServer === 'function') {
+      log(`Calling serverModule.startServer(${BACKEND_PORT})...`);
+      await serverModule.startServer(BACKEND_PORT);
+      const ready = await waitForBackendReady(BACKEND_PORT, 8000);
+      if (ready) {
+        log('In-process backend server is verified healthy and ready.');
+        return true;
       }
+    }
+  } catch (err) {
+    log('In-process backend startup note:', err.message);
+  }
 
+  // 3. Fallback: Spawn as child process if in-process did not succeed
+  try {
+    log('Attempting child process spawn fallback...');
+    const candidateScripts = [
+      path.join(process.resourcesPath, 'app.asar', 'backend', 'server.js'),
+      path.join(__dirname, '../backend/server.js'),
+      path.join(process.resourcesPath, 'backend', 'server.js')
+    ];
+
+    const serverScript = candidateScripts.find((p) => fs.existsSync(p));
+
+    if (serverScript) {
       const cwd = path.dirname(serverScript);
-
       backendProcess = fork(serverScript, [], {
         cwd,
-        env: { ...process.env, PORT: BACKEND_PORT, NODE_ENV: app.isPackaged ? 'production' : 'development' },
+        env: {
+          ...process.env,
+          PORT: BACKEND_PORT,
+          NODE_ENV: app.isPackaged ? 'production' : 'development'
+        },
         stdio: 'ignore'
       });
 
-      console.log(`[Electron] Spawned backend server process (PID: ${backendProcess.pid}) from ${serverScript}`);
+      log(`Spawned backend child process (PID: ${backendProcess.pid}) from: ${serverScript}`);
 
       backendProcess.on('error', (err) => {
-        console.error('[Electron] Failed to launch backend server child process:', err);
+        log('Backend child process error:', err.message);
       });
-    } catch (err) {
-      console.warn('[Electron] Backend server spawn error:', err.message);
+    } else {
+      log('No backend script found in candidate locations.');
     }
-  });
+  } catch (err) {
+    log('Backend spawn error:', err.message);
+  }
 
-  checkReq.end();
+  // Wait for server readiness
+  const isReady = await waitForBackendReady(BACKEND_PORT, 10000);
+  log(`Backend readiness result: ${isReady}`);
+  return isReady;
 }
 
 /**
- * Gracefully terminate backend child process when Electron closes
+ * Gracefully terminate backend server when Electron closes
  */
-function stopBackendServer() {
+async function stopBackendServer() {
+  log('Stopping backend server...');
+  if (serverModule && typeof serverModule.stopServer === 'function') {
+    try {
+      await serverModule.stopServer();
+      log('Stopped in-process backend server.');
+    } catch (err) {
+      log('Error stopping in-process backend:', err.message);
+    }
+    serverModule = null;
+  }
+
   if (backendProcess && !backendProcess.killed) {
     try {
       backendProcess.kill('SIGTERM');
       backendProcess = null;
-      console.log('[Electron] Terminated backend server process.');
+      log('Terminated backend child process.');
     } catch (err) {
-      console.warn('[Electron] Error terminating backend child process:', err.message);
+      log('Error terminating backend child process:', err.message);
     }
   }
 }
@@ -120,8 +218,8 @@ function createMenu(win) {
             dialog.showMessageBox(win, {
               type: 'info',
               title: 'About NSS-TEX ERP',
-              message: 'NSS TOWELS / TexMan ERP',
-              detail: 'Towels & Textiles Manufacturing Management System\nVersion 1.0.0\nBuilt with Electron, React, & PostgreSQL'
+              message: 'NSS TOWELS & KD TEXT ERP',
+              detail: 'Towels & Textiles Manufacturing Management System\nVersion 1.0.0\nBuilt with Electron, React, Express & PostgreSQL'
             });
           }
         }
@@ -134,15 +232,44 @@ function createMenu(win) {
 }
 
 /**
+ * Load the React frontend into the browser window
+ */
+function loadFrontend(win) {
+  if (!win || win.isDestroyed()) return;
+
+  const distHtmlPath = path.join(__dirname, '../dist/index.html');
+
+  if (!app.isPackaged && process.env.NODE_ENV !== 'production') {
+    const req = http.request({ hostname: '127.0.0.1', port: 5173, method: 'HEAD', timeout: 800 }, () => {
+      log('Loading Vite dev server at http://localhost:5173');
+      win.loadURL('http://localhost:5173');
+    });
+
+    req.on('error', () => {
+      if (fs.existsSync(distHtmlPath)) {
+        log('Vite dev server not detected. Loading dist/index.html');
+        win.loadFile(distHtmlPath);
+      } else {
+        win.loadURL('http://localhost:5173');
+      }
+    });
+
+    req.end();
+  } else {
+    log(`Loading production build from: ${distHtmlPath}`);
+    win.loadFile(distHtmlPath);
+  }
+}
+
+/**
  * Create the main desktop application window
  */
 function createWindow() {
-  // Ensure AppUserModelId is registered on Windows for taskbar grouping and icon display
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.nsstowels.erp');
   }
 
-  // Look for valid icon in candidate paths (prioritize unpacked resources and .ico/.png)
+  // Look for valid icon in candidate paths
   const candidateIconPaths = [
     path.join(process.resourcesPath, 'logo.ico'),
     path.join(process.resourcesPath, 'logo.png'),
@@ -164,12 +291,12 @@ function createWindow() {
         if (!img.isEmpty()) {
           appIcon = img;
           resolvedIconPath = candidate;
-          console.log(`[Electron] Successfully loaded application icon from: ${candidate}`);
+          log(`Successfully loaded application icon from: ${candidate}`);
           break;
         }
       }
     } catch (e) {
-      console.warn(`[Electron] Error checking candidate icon ${candidate}:`, e.message);
+      log(`Error checking candidate icon ${candidate}:`, e.message);
     }
   }
 
@@ -180,7 +307,7 @@ function createWindow() {
     minHeight: 700,
     title: 'NSS-TEX ERP - Manufacturing Management System',
     icon: resolvedIconPath || appIcon || undefined,
-    show: false, // Show when ready to prevent visual flickering
+    show: false,
     backgroundColor: '#0f172a',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -212,27 +339,49 @@ function createWindow() {
     }
   });
 
-  // Intelligent loader: If Vite dev server is running on 5173, load it; otherwise load built dist/index.html
-  const distHtmlPath = path.join(__dirname, '../dist/index.html');
+  // Display initial loading state while backend server initializes
+  const splashHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>NSS-TEX ERP</title>
+      <style>
+        body {
+          margin: 0;
+          background: #0f172a;
+          color: #f8fafc;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+          user-select: none;
+        }
+        .spinner {
+          width: 42px;
+          height: 42px;
+          border: 3px solid rgba(255,255,255,0.12);
+          border-radius: 50%;
+          border-top-color: #3b82f6;
+          animation: spin 0.8s linear infinite;
+          margin-bottom: 18px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .title { font-size: 19px; font-weight: 700; letter-spacing: 0.5px; }
+        .subtitle { font-size: 13px; color: #94a3b8; margin-top: 6px; }
+      </style>
+    </head>
+    <body>
+      <div class="spinner"></div>
+      <div class="title">NSS-TEX ERP</div>
+      <div class="subtitle">Starting backend services & connecting to PostgreSQL...</div>
+    </body>
+    </html>
+  `;
 
-  if (!app.isPackaged && process.env.NODE_ENV !== 'production') {
-    const req = http.request('http://localhost:5173', { method: 'HEAD', timeout: 700 }, (res) => {
-      mainWindow.loadURL('http://localhost:5173');
-    });
-
-    req.on('error', () => {
-      if (fs.existsSync(distHtmlPath)) {
-        console.log('[Electron] Vite dev server not detected. Loading production build from dist/index.html');
-        mainWindow.loadFile(distHtmlPath);
-      } else {
-        mainWindow.loadURL('http://localhost:5173');
-      }
-    });
-
-    req.end();
-  } else {
-    mainWindow.loadFile(distHtmlPath);
-  }
+  mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml)}`);
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -244,24 +393,31 @@ function createWindow() {
 }
 
 // App lifecycle
-app.whenReady().then(() => {
-  startBackendServer();
+app.whenReady().then(async () => {
+  log('Electron app is ready.');
   createWindow();
+  await startBackendServer();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    loadFrontend(mainWindow);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+      loadFrontend(mainWindow);
     }
   });
 });
 
-app.on('window-all-closed', () => {
-  stopBackendServer();
+app.on('window-all-closed', async () => {
+  log('Window all closed event.');
+  await stopBackendServer();
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-app.on('before-quit', () => {
-  stopBackendServer();
+app.on('before-quit', async () => {
+  log('Before quit event.');
+  await stopBackendServer();
 });

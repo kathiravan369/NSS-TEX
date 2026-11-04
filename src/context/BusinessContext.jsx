@@ -6,7 +6,7 @@ import logoKd from '../assets/kd-logo.png';
 export const BUSINESS_CONFIGS = {
   nss_text: {
     id: 'nss_text',
-    name: 'NSS Text',
+    name: 'NSS Tex',
     shortName: 'NSS-TEX',
     tagline: 'NSS Textiles ERP',
     subtitle: 'Towels & Textiles Manufacturing ERP',
@@ -21,7 +21,7 @@ export const BUSINESS_CONFIGS = {
   },
   kd_text: {
     id: 'kd_text',
-    name: 'KD Text',
+    name: 'KD Tex',
     shortName: 'KD-TEX',
     tagline: 'KD Textiles ERP',
     subtitle: 'Textiles Manufacturing ERP',
@@ -47,7 +47,7 @@ export function BusinessProvider({ children }) {
       if (stored && BUSINESS_CONFIGS[stored]) {
         return stored;
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   });
 
@@ -60,7 +60,7 @@ export function BusinessProvider({ children }) {
     try {
       sessionStorage.setItem('nss_active_business_id', bizId);
       localStorage.setItem('nss_last_business_id', bizId);
-    } catch (e) {}
+    } catch (e) { }
 
     setSelectedBusinessId(bizId);
     setIsSelecting(false);

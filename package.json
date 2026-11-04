@@ -32,12 +32,13 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "backend/**/*",
       "package.json"
     ],
     "extraResources": [
       {
-        "from": "backend",
-        "to": "backend"
+        "from": "backend/.env",
+        "to": "backend/.env"
       },
       {
         "from": "electron/logo.ico",

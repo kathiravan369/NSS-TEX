@@ -4,12 +4,18 @@ const cors = require('cors');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
 
-// Load environment variables
+// Load environment variables with fallback paths
 require('dotenv').config({ path: path.join(__dirname, '.env') });
+try {
+  if (process.resourcesPath) {
+    require('dotenv').config({ path: path.join(process.resourcesPath, 'backend', '.env') });
+  }
+} catch (e) {}
 require('dotenv').config();
 
 const {
   connectDB,
+  closePools,
   isDbConnected,
   maskURI,
   businessMiddleware,
@@ -42,7 +48,10 @@ const app = express();
 
 // Middlewares
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5000', 'http://localhost:5001'],
+  origin: (origin, callback) => {
+    // Allow all local, Electron (file://, null), postman, and dev origins
+    callback(null, true);
+  },
   credentials: true
 }));
 app.use(express.json());
@@ -159,11 +168,22 @@ app.use('/api/types', typeRoutes);
 // Centralized Error Handling
 app.use(errorHandler);
 
-async function startServer() {
+let serverInstance = null;
+
+async function startServer(port = PORT) {
+  if (serverInstance) {
+    console.log(`[Backend] Server is already running on port ${port}`);
+    return serverInstance;
+  }
+
+  const effectivePort = port || PORT;
+  const dbHost = process.env.PGHOST || 'localhost';
+  const dbPort = process.env.PGPORT || 5000;
+
   console.log('---------------------------------------------------------');
   console.log('🚀 Initializing NSS TOWELS & KD TEXT Backend Server...');
-  console.log(`📡 Port: ${PORT}`);
-  console.log(`🔒 Database Server: PostgreSQL on ${process.env.PGHOST || 'localhost'}:${DB_PORT}`);
+  console.log(`📡 Port: ${effectivePort}`);
+  console.log(`🔒 Database Server: PostgreSQL on ${dbHost}:${dbPort}`);
   console.log('---------------------------------------------------------');
 
   const connected = await connectDB();
@@ -172,15 +192,46 @@ async function startServer() {
     console.warn('⚠️ Server running with one or more database connections degraded.');
   }
 
-  app.listen(PORT, () => {
-    console.log(`✨ NSS & KD TEXT Backend is running on http://localhost:${PORT}`);
-    console.log(`🩺 Health check URL: http://localhost:${PORT}/api/health`);
-    console.log('---------------------------------------------------------');
+  return new Promise((resolve, reject) => {
+    const server = app.listen(effectivePort, '0.0.0.0', () => {
+      serverInstance = server;
+      console.log(`✨ NSS & KD TEXT Backend is running on http://localhost:${effectivePort}`);
+      console.log(`🩺 Health check URL: http://localhost:${effectivePort}/api/health`);
+      console.log('---------------------------------------------------------');
+      resolve(server);
+    });
+
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.warn(`[Backend] Port ${effectivePort} is already in use; assuming backend is active.`);
+        resolve(null);
+      } else {
+        console.error('[Backend] Server listen error:', err);
+        reject(err);
+      }
+    });
   });
+}
+
+async function stopServer() {
+  if (serverInstance) {
+    try {
+      await new Promise((resolve) => serverInstance.close(resolve));
+      console.log('[Backend] HTTP server closed gracefully.');
+    } catch (err) {
+      console.warn('[Backend] Error closing HTTP server:', err.message);
+    }
+    serverInstance = null;
+  }
+  await closePools();
 }
 
 if (require.main === module) {
   startServer();
 }
+
+app.startServer = startServer;
+app.stopServer = stopServer;
+app.app = app;
 
 module.exports = app;

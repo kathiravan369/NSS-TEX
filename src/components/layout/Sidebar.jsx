@@ -29,7 +29,7 @@ export default function Sidebar() {
   const location = useLocation();
   const { currentBusiness, openSelection } = useBusiness();
 
-  const brandName = currentBusiness ? currentBusiness.name : 'NSS Text';
+  const brandName = currentBusiness ? currentBusiness.name : 'NSS Tex';
   const brandSub = currentBusiness ? currentBusiness.subtitle : 'Towels & Textiles ERP';
   const brandLogo = currentBusiness ? currentBusiness.logo : logoImg;
   const brandFallback = currentBusiness ? currentBusiness.fallbackLogo : './logo.png';
