@@ -27,6 +27,8 @@ function formatDateYMD(dateStr) {
 export function computeMetricsFromStorage(selectedYear = null, selectedPeriod = 'This Month') {
   const threadGST = storageService.getCollection('threadGST') || [];
   const threadNoGST = storageService.getCollection('threadNoGST') || [];
+  const towelGST = storageService.getCollection('towelGST') || [];
+  const towelNoGST = storageService.getCollection('towelNoGST') || [];
   const oil = storageService.getCollection('oil') || [];
   const machinery = storageService.getCollection('machinery') || [];
   const electricity = storageService.getCollection('electricity') || [];
@@ -145,6 +147,8 @@ export function computeMetricsFromStorage(selectedYear = null, selectedPeriod = 
 
   threadGST.forEach(t => processMonthlyItem(t.date || t.createdAt, 'rawMaterial', Number(t.total) || 0));
   threadNoGST.forEach(t => processMonthlyItem(t.date || t.createdAt, 'rawMaterial', Number(t.total) || 0));
+  towelGST.forEach(t => processMonthlyItem(t.date || t.createdAt, 'rawMaterial', Number(t.total) || 0));
+  towelNoGST.forEach(t => processMonthlyItem(t.date || t.createdAt, 'rawMaterial', Number(t.total) || 0));
   oil.forEach(o => processMonthlyItem(o.date || o.createdAt, 'rawMaterial', Number(o.final !== undefined ? o.final : (o.total !== undefined ? o.total : o.cost)) || 0));
   machinery.forEach(m => processMonthlyItem(m.date || m.createdAt, 'machinery', Number(m.total !== undefined ? m.total : m.cost) || 0));
   electricity.forEach(e => processMonthlyItem(e.billDate || e.date || e.createdAt, 'electricity', Number(e.total !== undefined ? e.total : e.billAmount) || 0));
@@ -168,7 +172,7 @@ export function computeMetricsFromStorage(selectedYear = null, selectedPeriod = 
   const totalExpensesThisMonth = currentMonthExpenses > 0 ? currentMonthExpenses : totalExpenses;
 
   // 4. Key Statistics
-  const totalPurchasesCount = threadGST.length + threadNoGST.length + oil.length;
+  const totalPurchasesCount = threadGST.length + threadNoGST.length + towelGST.length + towelNoGST.length + oil.length;
   const totalProductionQty = weeklyPayroll.reduce((acc, p) => acc + (Number(p.productsProduced) || 0), 0);
   const totalLeaveDays = weeklyPayroll.reduce((acc, p) => acc + (Number(p.leaveDays) || 0), 0);
 
@@ -213,6 +217,30 @@ export function computeMetricsFromStorage(selectedYear = null, selectedPeriod = 
       category: 'Thread (Without GST)',
       desc: `${t.supplier || 'Supplier'} - ${t.threadType || 'Yarn'} ${t.qty || ''} ${t.unit || 'Kg'}`,
       refNo: t.invoiceNo || `TP-${String(t.id || t._id || '').slice(-4)}`,
+      amount: Number(t.total) || 0,
+      status: t.status || 'Paid'
+    });
+  });
+
+  towelGST.forEach(t => {
+    transactions.push({
+      id: t._id || t.id,
+      date: formatDateYMD(t.date || t.createdAt),
+      category: 'Towel (GST)',
+      desc: `${t.supplier || 'Supplier'} - ${t.towelType || 'Towel'} ${t.qty || ''} ${t.unit || 'Pcs'}`,
+      refNo: t.invoiceNo || `TWL-${String(t.id || t._id || '').slice(-4)}`,
+      amount: Number(t.total) || 0,
+      status: t.status || 'Paid'
+    });
+  });
+
+  towelNoGST.forEach(t => {
+    transactions.push({
+      id: t._id || t.id,
+      date: formatDateYMD(t.date || t.createdAt),
+      category: 'Towel (Without GST)',
+      desc: `${t.supplier || 'Supplier'} - ${t.towelType || 'Towel'} ${t.qty || ''} ${t.unit || 'Pcs'}`,
+      refNo: t.invoiceNo || `TWL-${String(t.id || t._id || '').slice(-4)}`,
       amount: Number(t.total) || 0,
       status: t.status || 'Paid'
     });

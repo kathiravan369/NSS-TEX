@@ -1,5 +1,6 @@
 const Employee = require('./Employee');
 const ThreadPurchase = require('./ThreadPurchase');
+const TowelPurchase = require('./TowelPurchase');
 const OilPurchase = require('./OilPurchase');
 const OilStock = require('./OilStock');
 const MachineryExpense = require('./MachineryExpense');
@@ -13,6 +14,7 @@ const MasterType = require('./MasterType');
 module.exports = {
   Employee,
   ThreadPurchase,
+  TowelPurchase,
   OilPurchase,
   OilStock,
   MachineryExpense,

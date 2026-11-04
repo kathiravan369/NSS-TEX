@@ -61,7 +61,7 @@ export function cleanAccidentalDuplicates(list) {
     // Fingerprint based on identical physical item specifications
     const specKey = item.invoiceNo
       ? `inv_${item.invoiceNo}`
-      : `${item.supplier || ''}_${item.threadType || item.machine || item.oilType || ''}_${item.qty || ''}_${item.rate || item.cost || ''}_${item.total || ''}`;
+      : `${item.supplier || ''}_${item.threadType || item.towelType || item.machine || item.oilType || ''}_${item.qty || ''}_${item.rate || item.cost || ''}_${item.total || ''}`;
 
     const isSpecificItem = (item.supplier || item.machine) && item.total;
 
@@ -161,6 +161,12 @@ export const storageService = {
         case 'threadNoGST':
           res = await api.threadPurchases.create({ ...item, gstMode: 'WITHOUT_GST' });
           break;
+        case 'towelGST':
+          res = await api.towelPurchases.create({ ...item, gstMode: 'WITH_GST' });
+          break;
+        case 'towelNoGST':
+          res = await api.towelPurchases.create({ ...item, gstMode: 'WITHOUT_GST' });
+          break;
         case 'oil':
           res = await api.oil.createPurchase(item);
           break;
@@ -245,6 +251,10 @@ export const storageService = {
         case 'threadNoGST':
           res = await api.threadPurchases.update(syncId, merged);
           break;
+        case 'towelGST':
+        case 'towelNoGST':
+          res = await api.towelPurchases.update(syncId, merged);
+          break;
         case 'oil':
           res = await api.oil.updatePurchase(syncId, merged);
           break;
@@ -303,6 +313,10 @@ export const storageService = {
         case 'threadNoGST':
           await api.threadPurchases.delete(syncId);
           break;
+        case 'towelGST':
+        case 'towelNoGST':
+          await api.towelPurchases.delete(syncId);
+          break;
         case 'machinery':
           await api.machinery.delete(syncId);
           break;
@@ -338,6 +352,12 @@ export const storageService = {
           break;
         case 'threadNoGST':
           res = await api.threadPurchases.getAll({ ...params, gstMode: 'WITHOUT_GST' });
+          break;
+        case 'towelGST':
+          res = await api.towelPurchases.getAll({ ...params, gstMode: 'WITH_GST' });
+          break;
+        case 'towelNoGST':
+          res = await api.towelPurchases.getAll({ ...params, gstMode: 'WITHOUT_GST' });
           break;
         case 'oil':
           res = await api.oil.getPurchases(params);

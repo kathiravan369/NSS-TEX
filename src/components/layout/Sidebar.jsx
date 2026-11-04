@@ -20,7 +20,8 @@ import {
   TrendingUp,
   BarChart3,
   Settings,
-  FileBarChart
+  FileBarChart,
+  Package
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -31,6 +32,7 @@ export default function Sidebar() {
   const [salesGroupOpen, setSalesGroupOpen] = useState(true);
 
   // Sub-sections inside Purchases
+  const [purchaseSubOpen, setPurchaseSubOpen] = useState(true);
   const [productionOpen, setProductionOpen] = useState(true);
   const [rawMaterialsOpen, setRawMaterialsOpen] = useState(true);
   const [salaryOpen, setSalaryOpen] = useState(true);
@@ -41,6 +43,7 @@ export default function Sidebar() {
 
   const isPurchasesRoute =
     location.pathname === '/' ||
+    location.pathname.startsWith('/purchase') ||
     location.pathname.startsWith('/raw-materials') ||
     location.pathname.startsWith('/machinery-cost') ||
     location.pathname.startsWith('/electricity-cost') ||
@@ -76,7 +79,7 @@ export default function Sidebar() {
       <nav className="sidebar-nav">
         {/* ======================================================== */}
         {/* MASTER SECTION 1: PURCHASES                             */}
-        {/* Inside: Dashboard, Production, Salary                    */}
+        {/* Inside: Dashboard, Purchase, Production, Salary          */}
         {/* ======================================================== */}
         <button
           type="button"
@@ -104,7 +107,39 @@ export default function Sidebar() {
               </div>
             </NavLink>
 
-            {/* 2. Production */}
+            {/* 2. Purchase (New Separate Purchase Tab) */}
+            <button
+              type="button"
+              className="nav-item"
+              onClick={() => setPurchaseSubOpen(!purchaseSubOpen)}
+            >
+              <div className="nav-item-left">
+                <ShoppingCart size={16} />
+                <span>Purchase</span>
+              </div>
+              {purchaseSubOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </button>
+
+            {purchaseSubOpen && (
+              <div className="submenu">
+                <NavLink
+                  to="/purchase/towel-gst"
+                  className={({ isActive }) => `submenu-item ${isActive ? 'active' : ''}`}
+                >
+                  <Package size={14} />
+                  <span>Towel with GST</span>
+                </NavLink>
+                <NavLink
+                  to="/purchase/towel-no-gst"
+                  className={({ isActive }) => `submenu-item ${isActive ? 'active' : ''}`}
+                >
+                  <Package size={14} />
+                  <span>Towel without GST</span>
+                </NavLink>
+              </div>
+            )}
+
+            {/* 3. Production */}
             <button
               type="button"
               className="nav-item"

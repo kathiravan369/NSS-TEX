@@ -4,6 +4,7 @@
 const runtimeStore = {
   employees: [],
   threadPurchases: [],
+  towelPurchases: [],
   oilPurchases: [],
   oilStock: [],
   machineryExpenses: [],

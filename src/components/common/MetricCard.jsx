@@ -30,7 +30,7 @@ export default function MetricCard({
     >
       {Icon && (
         <div className="metric-icon-box" style={{ backgroundColor: iconBg, color: iconColor }}>
-          <Icon size={18} />
+          {React.isValidElement(Icon) ? Icon : <Icon size={18} />}
         </div>
       )}
       <div className="metric-info">

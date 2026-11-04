@@ -2,6 +2,8 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
+import TowelPurchaseGST from './pages/TowelPurchaseGST';
+import TowelPurchaseNoGST from './pages/TowelPurchaseNoGST';
 import ThreadPurchaseGST from './pages/ThreadPurchaseGST';
 import ThreadPurchaseNoGST from './pages/ThreadPurchaseNoGST';
 import OilPurchase from './pages/OilPurchase';
@@ -22,6 +24,15 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Layout />}>
         <Route index element={<Dashboard />} />
+
+        {/* Purchase Module Routes */}
+        <Route path="purchase" element={<Navigate to="/purchase/towel-gst" replace />} />
+        <Route path="purchase/towel-gst" element={<TowelPurchaseGST />} />
+        <Route path="purchase/towel-no-gst" element={<TowelPurchaseNoGST />} />
+        <Route path="purchase/towel-with-gst" element={<Navigate to="/purchase/towel-gst" replace />} />
+        <Route path="purchase/towel-without-gst" element={<Navigate to="/purchase/towel-no-gst" replace />} />
+
+        {/* Production & Raw Materials Routes */}
         <Route path="raw-materials/thread-gst" element={<ThreadPurchaseGST />} />
         <Route path="raw-materials/thread-no-gst" element={<ThreadPurchaseNoGST />} />
         <Route path="raw-materials/oil" element={<OilPurchase />} />

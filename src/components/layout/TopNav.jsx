@@ -22,6 +22,8 @@ export default function TopNav() {
   const [overdueSummary, setOverdueSummary] = useState({
     threadGST: [],
     threadNoGST: [],
+    towelGST: [],
+    towelNoGST: [],
     machinery: [],
     invoicesDue: [],
     customerReorders: []
@@ -31,6 +33,8 @@ export default function TopNav() {
     const checkOverdues = () => {
       const tg = storageService.getCollection('threadGST').filter(x => isOverdue(x));
       const tng = storageService.getCollection('threadNoGST').filter(x => isOverdue(x));
+      const towG = storageService.getCollection('towelGST').filter(x => isOverdue(x));
+      const towNoG = storageService.getCollection('towelNoGST').filter(x => isOverdue(x));
       const mach = storageService.getCollection('machinery').filter(x => isOverdue(x));
 
       // Customer Invoices Due / Overdue
@@ -55,6 +59,8 @@ export default function TopNav() {
       setOverdueSummary({
         threadGST: tg,
         threadNoGST: tng,
+        towelGST: towG,
+        towelNoGST: towNoG,
         machinery: mach,
         invoicesDue: invsDue,
         customerReorders: reordersDue
@@ -69,6 +75,8 @@ export default function TopNav() {
   const totalOverdues =
     overdueSummary.threadGST.length +
     overdueSummary.threadNoGST.length +
+    (overdueSummary.towelGST?.length || 0) +
+    (overdueSummary.towelNoGST?.length || 0) +
     overdueSummary.machinery.length +
     overdueSummary.invoicesDue.length +
     (overdueSummary.customerReorders.length > 0 ? 1 : 0);
@@ -77,6 +85,19 @@ export default function TopNav() {
   const getBreadcrumbs = () => {
     const path = location.pathname;
     if (path === '/') return [{ label: 'Dashboard', path: '/' }];
+
+    if (path === '/purchase/towel-gst') {
+      return [
+        { label: 'Purchase', path: '#' },
+        { label: 'Towel (With GST)', path: '/purchase/towel-gst' }
+      ];
+    }
+    if (path === '/purchase/towel-no-gst') {
+      return [
+        { label: 'Purchase', path: '#' },
+        { label: 'Towel (Without GST)', path: '/purchase/towel-no-gst' }
+      ];
+    }
 
     if (path === '/raw-materials/thread-gst') {
       return [
@@ -331,6 +352,52 @@ export default function TopNav() {
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#881337', marginTop: '2px' }}>
                         {overdueSummary.threadNoGST.length} purchase(s) have passed the 45-day due date.
+                      </div>
+                    </div>
+                  )}
+
+                  {overdueSummary.towelGST?.length > 0 && (
+                    <div
+                      onClick={() => {
+                        setIsNotifOpen(false);
+                        navigate('/purchase/towel-gst');
+                      }}
+                      style={{
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: '#fff1f2',
+                        border: '1px solid #fecdd3',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#be123c', fontWeight: 600, fontSize: '0.8rem' }}>
+                        <AlertTriangle size={14} /> Towel Purchase (With GST)
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#881337', marginTop: '2px' }}>
+                        {overdueSummary.towelGST.length} towel purchase(s) have passed the 45-day due date.
+                      </div>
+                    </div>
+                  )}
+
+                  {overdueSummary.towelNoGST?.length > 0 && (
+                    <div
+                      onClick={() => {
+                        setIsNotifOpen(false);
+                        navigate('/purchase/towel-no-gst');
+                      }}
+                      style={{
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: '#fff1f2',
+                        border: '1px solid #fecdd3',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#be123c', fontWeight: 600, fontSize: '0.8rem' }}>
+                        <AlertTriangle size={14} /> Towel Purchase (Without GST)
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#881337', marginTop: '2px' }}>
+                        {overdueSummary.towelNoGST.length} towel purchase(s) have passed the 45-day due date.
                       </div>
                     </div>
                   )}

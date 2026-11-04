@@ -15,6 +15,7 @@ const errorHandler = require('./middleware/errorHandler');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const threadPurchaseRoutes = require('./routes/threadPurchaseRoutes');
+const towelPurchaseRoutes = require('./routes/towelPurchaseRoutes');
 const oilRoutes = require('./routes/oilRoutes');
 const machineryRoutes = require('./routes/machineryRoutes');
 const electricityRoutes = require('./routes/electricityRoutes');
@@ -77,6 +78,7 @@ app.get('/api', (req, res) => {
       dashboardRecent: '/api/dashboard/recent-transactions',
       employees: '/api/employees',
       threadPurchases: '/api/thread-purchases',
+      towelPurchases: '/api/towel-purchases',
       oilPurchases: '/api/oil-purchases',
       oilStock: '/api/oil-purchases/stock',
       machinery: '/api/machinery-expenses',
@@ -93,6 +95,7 @@ app.get('/api', (req, res) => {
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/thread-purchases', threadPurchaseRoutes);
+app.use('/api/towel-purchases', towelPurchaseRoutes);
 app.use('/api/oil-purchases', oilRoutes);
 app.use('/api/oil-stock', (req, res, next) => {
   const { getOilStock } = require('./controllers/oilController');

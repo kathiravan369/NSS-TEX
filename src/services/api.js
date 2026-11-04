@@ -139,6 +139,33 @@ export const api = {
     }
   },
 
+  // 3b. Towel Purchases Endpoints (With & Without GST)
+  towelPurchases: {
+    getAll(params = {}) {
+      return request(`/towel-purchases${buildQuery(params)}`);
+    },
+    getById(id) {
+      return request(`/towel-purchases/${id}`);
+    },
+    create(data) {
+      return request('/towel-purchases', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+    update(id, data) {
+      return request(`/towel-purchases/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
+    delete(id) {
+      return request(`/towel-purchases/${id}`, {
+        method: 'DELETE'
+      });
+    }
+  },
+
   // 4. Oil Purchases & Inventory Endpoints
   oil: {
     getPurchases(params = {}) {

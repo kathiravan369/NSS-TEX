@@ -51,6 +51,34 @@ CREATE TABLE IF NOT EXISTS thread_purchases (
 CREATE INDEX IF NOT EXISTS idx_thread_purchases_date ON thread_purchases(date);
 CREATE INDEX IF NOT EXISTS idx_thread_purchases_supplier ON thread_purchases(supplier);
 
+CREATE TABLE IF NOT EXISTS towel_purchases (
+  id SERIAL PRIMARY KEY,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  due_date DATE,
+  supplier VARCHAR(255) NOT NULL,
+  towel_type VARCHAR(255) NOT NULL,
+  qty NUMERIC(12,2) NOT NULL DEFAULT 0,
+  unit VARCHAR(20) DEFAULT 'Pcs',
+  rate NUMERIC(12,2) NOT NULL DEFAULT 0,
+  gst_mode VARCHAR(30) DEFAULT 'WITH_GST',
+  gst_rate NUMERIC(6,2) DEFAULT 0,
+  subtotal NUMERIC(12,2) DEFAULT 0,
+  gst_amount NUMERIC(12,2) DEFAULT 0,
+  total NUMERIC(12,2) DEFAULT 0,
+  paid_amount NUMERIC(12,2) DEFAULT 0,
+  balance_amount NUMERIC(12,2) DEFAULT 0,
+  paid_at TIMESTAMPTZ,
+  invoice_no VARCHAR(100) DEFAULT '',
+  status VARCHAR(30) DEFAULT 'Paid',
+  notes TEXT DEFAULT '',
+  items JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_towel_purchases_date ON towel_purchases(date);
+CREATE INDEX IF NOT EXISTS idx_towel_purchases_supplier ON towel_purchases(supplier);
+
 CREATE TABLE IF NOT EXISTS oil_purchases (
   id SERIAL PRIMARY KEY,
   date DATE NOT NULL DEFAULT CURRENT_DATE,
