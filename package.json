@@ -37,6 +37,14 @@
       {
         "from": "backend",
         "to": "backend"
+      },
+      {
+        "from": "electron/logo.ico",
+        "to": "logo.ico"
+      },
+      {
+        "from": "electron/logo.png",
+        "to": "logo.png"
       }
     ],
     "win": {

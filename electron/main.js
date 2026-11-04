@@ -137,8 +137,16 @@ function createMenu(win) {
  * Create the main desktop application window
  */
 function createWindow() {
-  // Look for valid icon in candidate paths (supports both .ico and .png on Windows)
+  // Ensure AppUserModelId is registered on Windows for taskbar grouping and icon display
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.nsstowels.erp');
+  }
+
+  // Look for valid icon in candidate paths (prioritize unpacked resources and .ico/.png)
   const candidateIconPaths = [
+    path.join(process.resourcesPath, 'logo.ico'),
+    path.join(process.resourcesPath, 'logo.png'),
+    path.join(path.dirname(process.execPath), 'logo.ico'),
     path.join(__dirname, 'logo.ico'),
     path.join(__dirname, 'logo.png'),
     path.join(__dirname, '../public/logo.png'),
@@ -147,13 +155,21 @@ function createWindow() {
   ];
 
   let appIcon = null;
+  let resolvedIconPath = null;
+
   for (const candidate of candidateIconPaths) {
-    if (fs.existsSync(candidate)) {
-      const img = nativeImage.createFromPath(candidate);
-      if (!img.isEmpty()) {
-        appIcon = img;
-        break;
+    try {
+      if (fs.existsSync(candidate)) {
+        const img = nativeImage.createFromPath(candidate);
+        if (!img.isEmpty()) {
+          appIcon = img;
+          resolvedIconPath = candidate;
+          console.log(`[Electron] Successfully loaded application icon from: ${candidate}`);
+          break;
+        }
       }
+    } catch (e) {
+      console.warn(`[Electron] Error checking candidate icon ${candidate}:`, e.message);
     }
   }
 
@@ -163,7 +179,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: 'NSS-TEX ERP - Manufacturing Management System',
-    icon: appIcon || undefined,
+    icon: resolvedIconPath || appIcon || undefined,
     show: false, // Show when ready to prevent visual flickering
     backgroundColor: '#0f172a',
     webPreferences: {
