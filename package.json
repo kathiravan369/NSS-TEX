@@ -23,6 +23,7 @@
   },
   "build": {
     "appId": "com.nsstowels.erp",
+    "electronDist": "node_modules/electron/dist",
     "productName": "NSS-TEX ERP",
     "copyright": "Copyright © 2026 NSS TOWELS",
     "directories": {

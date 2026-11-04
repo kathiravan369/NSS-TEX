@@ -260,3 +260,4 @@ content = content.replace(target3, replacement3);
 
 fs.writeFileSync(filePath, content.replace(/\n/g, '\r\n'), 'utf8');
 console.log('TopNav.jsx patched successfully!');
+

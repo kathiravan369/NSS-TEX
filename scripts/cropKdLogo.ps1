@@ -37,3 +37,4 @@ $crop.Save($out2, [System.Drawing.Imaging.ImageFormat]::Png)
 $crop.Dispose()
 $src.Dispose()
 Write-Output "Saved KD logo to $out1 and $out2"
+

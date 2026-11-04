@@ -91,3 +91,4 @@ content = content.replace(target4, replacement4);
 
 fs.writeFileSync(filePath, content.replace(/\n/g, '\r\n'), 'utf8');
 console.log('Dashboard.jsx patched successfully!');
+
