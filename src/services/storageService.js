@@ -4,9 +4,23 @@
 import { api } from './api';
 import { formatDate, formatDateTime, getItemDueDate, isOverdue, getPaymentStatus } from '../utils/formatters';
 
+export function getActiveBusinessPrefix() {
+  try {
+    if (typeof window !== 'undefined') {
+      const biz =
+        window.sessionStorage?.getItem('nss_active_business_id') ||
+        window.localStorage?.getItem('nss_last_business_id') ||
+        'nss_text';
+      return `nsstowels_${biz}`;
+    }
+  } catch (e) {}
+  return 'nsstowels_nss_text';
+}
+
 function getStorage(key, fallback = []) {
   try {
-    const item = localStorage.getItem(`nsstowels_${key}`);
+    const prefix = getActiveBusinessPrefix();
+    const item = localStorage.getItem(`${prefix}_${key}`);
     return item ? JSON.parse(item) : fallback;
   } catch (e) {
     return fallback;
@@ -15,7 +29,8 @@ function getStorage(key, fallback = []) {
 
 function setStorage(key, val) {
   try {
-    localStorage.setItem(`nsstowels_${key}`, JSON.stringify(val));
+    const prefix = getActiveBusinessPrefix();
+    localStorage.setItem(`${prefix}_${key}`, JSON.stringify(val));
   } catch (e) {
     console.error('Storage save error:', e);
   }
@@ -336,6 +351,25 @@ export const storageService = {
       console.warn(`[Sync Warning] Delete ${key} from backend:`, err.message);
     }
 
+    return true;
+  },
+
+  // Reload all active business collections from PostgreSQL DB
+  async reloadAllCollections() {
+    const keys = [
+      'threadGST',
+      'threadNoGST',
+      'towelGST',
+      'towelNoGST',
+      'oil',
+      'machinery',
+      'electricity',
+      'employees',
+      'weeklyPayroll',
+      'customers',
+      'invoices'
+    ];
+    await Promise.allSettled(keys.map(k => this.fetchLiveCollection(k)));
     return true;
   },
 

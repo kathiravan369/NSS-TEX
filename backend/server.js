@@ -8,7 +8,16 @@ const mongoose = require('mongoose');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 require('dotenv').config();
 
-const { connectDB, isDbConnected, maskURI } = require('./config/db');
+const {
+  connectDB,
+  isDbConnected,
+  maskURI,
+  businessMiddleware,
+  setActiveBusiness,
+  getActiveBusiness,
+  getBusinessList,
+  BUSINESS_CONFIG
+} = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
 
 // Route Modules
@@ -27,7 +36,6 @@ const salesRoutes = require('./routes/salesRoutes');
 const typeRoutes = require('./routes/typeRoutes');
 
 const PORT = process.env.PORT || 5001;
-const DB_NAME = process.env.PGDATABASE || 'nss_towels';
 const DB_PORT = process.env.PGPORT || 5000;
 
 const app = express();
@@ -44,23 +52,55 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
 }
 
+// Multi-Business Context Middleware
+app.use(businessMiddleware);
+
+// Multi-Business Management Endpoints
+app.get('/api/businesses', (req, res) => {
+  res.json({
+    success: true,
+    activeBusiness: getActiveBusiness(),
+    businesses: getBusinessList()
+  });
+});
+
+app.post('/api/businesses/select', (req, res) => {
+  const { businessId } = req.body;
+  if (!businessId || !BUSINESS_CONFIG[businessId]) {
+    return res.status(400).json({
+      success: false,
+      error: `Invalid business ID: "${businessId}". Allowed: ${Object.keys(BUSINESS_CONFIG).join(', ')}`
+    });
+  }
+
+  const updated = setActiveBusiness(businessId);
+  res.json({
+    success: true,
+    message: `Active business switched to ${updated.name}`,
+    activeBusiness: updated
+  });
+});
+
 // Health Endpoint
 app.get('/api/health', (req, res) => {
   const connected = isDbConnected();
+  const currentBiz = getActiveBusiness();
 
   res.status(connected ? 200 : 503).json({
     success: true,
     status: connected ? 'HEALTHY' : 'DEGRADED',
-    message: 'NSS TOWELS Manufacturing Management System API (PostgreSQL)',
+    message: 'NSS TOWELS & KD TEXT Multi-Business ERP Backend (PostgreSQL)',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     port: PORT,
+    activeBusiness: currentBiz,
+    businesses: getBusinessList(),
     database: {
       type: 'PostgreSQL',
       status: connected ? 'connected' : 'disconnected',
       connected: connected,
-      name: DB_NAME,
+      name: currentBiz.database,
       host: `${process.env.PGHOST || 'localhost'}:${DB_PORT}`
     }
   });
@@ -69,10 +109,12 @@ app.get('/api/health', (req, res) => {
 // Root API Directory
 app.get('/api', (req, res) => {
   res.json({
-    message: 'Welcome to NSS TOWELS / TexMan ERP Backend REST API',
+    message: 'Welcome to NSS TOWELS / KD TEXT ERP Backend REST API',
     version: '1.0.0',
     endpoints: {
       health: '/api/health',
+      businesses: '/api/businesses',
+      selectBusiness: 'POST /api/businesses/select',
       dashboard: '/api/dashboard/summary',
       dashboardExpenses: '/api/dashboard/expenses',
       dashboardRecent: '/api/dashboard/recent-transactions',
@@ -119,19 +161,19 @@ app.use(errorHandler);
 
 async function startServer() {
   console.log('---------------------------------------------------------');
-  console.log('🚀 Initializing NSS TOWELS Backend Server...');
+  console.log('🚀 Initializing NSS TOWELS & KD TEXT Backend Server...');
   console.log(`📡 Port: ${PORT}`);
-  console.log(`🔒 Database Target: PostgreSQL (${DB_NAME} on ${process.env.PGHOST || 'localhost'}:${DB_PORT})`);
+  console.log(`🔒 Database Server: PostgreSQL on ${process.env.PGHOST || 'localhost'}:${DB_PORT}`);
   console.log('---------------------------------------------------------');
 
   const connected = await connectDB();
 
   if (!connected) {
-    console.warn('⚠️ Server running in STANDBY mode with in-memory persistence.');
+    console.warn('⚠️ Server running with one or more database connections degraded.');
   }
 
   app.listen(PORT, () => {
-    console.log(`✨ NSS TOWELS Backend is running on http://localhost:${PORT}`);
+    console.log(`✨ NSS & KD TEXT Backend is running on http://localhost:${PORT}`);
     console.log(`🩺 Health check URL: http://localhost:${PORT}/api/health`);
     console.log('---------------------------------------------------------');
   });

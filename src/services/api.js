@@ -14,9 +14,20 @@ const API_BASE_URL =
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
+  let currentBusinessId = 'nss_text';
+  try {
+    if (typeof window !== 'undefined') {
+      currentBusinessId =
+        window.sessionStorage?.getItem('nss_active_business_id') ||
+        window.localStorage?.getItem('nss_last_business_id') ||
+        'nss_text';
+    }
+  } catch (e) {}
+
   const headers = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    'X-Business-Id': currentBusinessId,
     ...(options.headers || {})
   };
 
@@ -70,6 +81,19 @@ function buildQuery(params = {}) {
 
 export const api = {
   baseURL: API_BASE_URL,
+
+  // 0. Multi-Business Endpoints
+  businesses: {
+    getAll() {
+      return request('/businesses');
+    },
+    select(businessId) {
+      return request('/businesses/select', {
+        method: 'POST',
+        body: JSON.stringify({ businessId })
+      });
+    }
+  },
 
   // 1. Dashboard Endpoints
   dashboard: {

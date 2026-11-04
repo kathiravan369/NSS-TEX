@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import logoImg from '../../assets/logo.png';
+import { useBusiness } from '../../context/BusinessContext';
 import {
   LayoutDashboard,
   Boxes,
@@ -26,6 +27,12 @@ import {
 
 export default function Sidebar() {
   const location = useLocation();
+  const { currentBusiness, openSelection } = useBusiness();
+
+  const brandName = currentBusiness ? currentBusiness.name : 'NSS Text';
+  const brandSub = currentBusiness ? currentBusiness.subtitle : 'Towels & Textiles ERP';
+  const brandLogo = currentBusiness ? currentBusiness.logo : logoImg;
+  const brandFallback = currentBusiness ? currentBusiness.fallbackLogo : './logo.png';
 
   // Master sections
   const [purchasesOpen, setPurchasesOpen] = useState(true);
@@ -56,22 +63,26 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       {/* Brand Header */}
-      <div className="sidebar-header">
+      <div className="sidebar-header" style={{ position: 'relative' }}>
         <div className="sidebar-logo-container">
           <img
-            src={logoImg}
-            alt="NSS-TEX Logo"
+            src={brandLogo}
+            alt={`${brandName} Logo`}
             className="sidebar-logo-img"
             onError={(e) => {
-              if (!e.currentTarget.src.endsWith('logo.png')) {
-                e.currentTarget.src = './logo.png';
+              if (brandFallback && e.currentTarget.src !== brandFallback) {
+                e.currentTarget.src = brandFallback;
               }
             }}
           />
         </div>
-        <div>
-          <h1 className="sidebar-brand-title">NSS-TEX</h1>
-          <p className="sidebar-brand-subtitle">Towels & Textiles ERP</p>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h1 className="sidebar-brand-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {brandName}
+          </h1>
+          <p className="sidebar-brand-subtitle" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {brandSub}
+          </p>
         </div>
       </div>
 

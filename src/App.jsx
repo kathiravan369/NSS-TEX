@@ -1,5 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { BusinessProvider, useBusiness } from './context/BusinessContext';
+import BusinessSelection from './pages/BusinessSelection';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import TowelPurchaseGST from './pages/TowelPurchaseGST';
@@ -19,9 +21,17 @@ import CreateInvoice from './pages/CreateInvoice';
 import InvoiceView from './pages/InvoiceView';
 import SalesDetails from './pages/SalesDetails';
 
-export default function App() {
+function AppContent() {
+  const { selectedBusinessId, isSelecting } = useBusiness();
+
+  // Initial startup screen: if no business is selected or user explicitly clicked switch/select
+  if (!selectedBusinessId || isSelecting) {
+    return <BusinessSelection />;
+  }
+
   return (
     <Routes>
+      <Route path="/select-business" element={<BusinessSelection />} />
       <Route path="/" element={<Layout />}>
         <Route index element={<Dashboard />} />
 
@@ -38,6 +48,7 @@ export default function App() {
         <Route path="raw-materials/oil" element={<OilPurchase />} />
         <Route path="machinery-cost" element={<MachineryCost />} />
         <Route path="electricity-cost" element={<ElectricityCost />} />
+
         {/* Salary Module Routes */}
         <Route path="salary" element={<Navigate to="/salary/employees" replace />} />
         <Route path="salary/employees" element={<EmployeeManagement />} />
@@ -66,5 +77,13 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <BusinessProvider>
+      <AppContent />
+    </BusinessProvider>
   );
 }

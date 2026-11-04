@@ -40,9 +40,11 @@ import StatusBadge from '../components/common/StatusBadge';
 import DateRangePicker from '../components/common/DateRangePicker';
 import { dashboardService } from '../services/dashboardService';
 import { formatINR } from '../utils/formatters';
+import { useBusiness } from '../context/BusinessContext';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { selectedBusinessId, currentBusiness } = useBusiness();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -70,7 +72,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData(trendYear, statsPeriod);
-  }, [trendYear, statsPeriod]);
+  }, [trendYear, statsPeriod, selectedBusinessId]);
 
   if (loading) {
     return (
@@ -114,8 +116,23 @@ export default function Dashboard() {
       {/* Header */}
       <div className="page-header">
         <div>
-          <h2 className="page-title">Dashboard</h2>
-          <p className="page-subtitle">Overview of your manufacturing expenses, production and salary details</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <h2 className="page-title">Dashboard</h2>
+            {currentBusiness && (
+              <span style={{
+                fontSize: '0.75rem',
+                padding: '0.2rem 0.65rem',
+                borderRadius: '9999px',
+                backgroundColor: currentBusiness.badgeBg,
+                color: currentBusiness.badgeColor,
+                border: `1px solid ${currentBusiness.badgeBorder}`,
+                fontWeight: 600
+              }}>
+                {currentBusiness.name}
+              </span>
+            )}
+          </div>
+          <p className="page-subtitle">Overview of {currentBusiness?.name || 'NSS-TEX'} manufacturing expenses, production and salary details</p>
         </div>
         <div className="date-pill">
           <Calendar size={14} />
